@@ -42,6 +42,17 @@ class _Era {
 
 const _eras = [
   _Era(
+    year: '2016',
+    label: '입문기',
+    description: '영상 편집을 처음 시작한 시기. 기초 편집, 자막, 간단한 모션.',
+    hero: _VideoClip(title: '메인 영상'),
+    subs: [
+      _VideoClip(title: '서브 영상 1'),
+      _VideoClip(title: '서브 영상 2'),
+      _VideoClip(title: '서브 영상 3'),
+    ],
+  ),
+  _Era(
     year: '2018',
     label: '동인계',
     description: '동인계 영상 작업. 팬 무비, MAD, AMV 등 2차 창작 기반의 영상 편집을 시작한 시기.',
@@ -93,6 +104,17 @@ const _eras = [
     subs: [
       _VideoClip(title: '서브 영상 1'),
       _VideoClip(title: '서브 영상 2'),
+    ],
+  ),
+  _Era(
+    year: '2026',
+    label: '현재',
+    description: '현재 진행 중인 작업들.',
+    hero: _VideoClip(title: '메인 영상'),
+    subs: [
+      _VideoClip(title: '서브 영상 1'),
+      _VideoClip(title: '서브 영상 2'),
+      _VideoClip(title: '서브 영상 3'),
     ],
   ),
 ];
@@ -698,19 +720,14 @@ class _EraPage extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // Sub videos row
+          // Sub videos with pagination arrows
           if (era.subs.isNotEmpty)
             SizedBox(
               height: isMobile ? 100 : 120,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: era.subs.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 12),
-                itemBuilder: (context, i) => _SubVideoCard(
-                  clip: era.subs[i],
-                  width: isMobile ? 150 : 180,
-                  onTap: () => onSubTap(era.subs[i]),
-                ),
+              child: _SubVideoStrip(
+                subs: era.subs,
+                isMobile: isMobile,
+                onTap: onSubTap,
               ),
             ),
         ],
@@ -821,6 +838,156 @@ class _HeroVideoState extends State<_HeroVideo> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Sub Video Strip (horizontal list with arrow pagination)
+// ---------------------------------------------------------------------------
+
+class _SubVideoStrip extends StatefulWidget {
+  final List<_VideoClip> subs;
+  final bool isMobile;
+  final ValueChanged<_VideoClip> onTap;
+
+  const _SubVideoStrip({
+    required this.subs,
+    required this.isMobile,
+    required this.onTap,
+  });
+
+  @override
+  State<_SubVideoStrip> createState() => _SubVideoStripState();
+}
+
+class _SubVideoStripState extends State<_SubVideoStrip> {
+  final ScrollController _controller = ScrollController();
+  bool _canScrollLeft = false;
+  bool _canScrollRight = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_updateArrows);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateArrows());
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _updateArrows() {
+    if (!_controller.hasClients) return;
+    setState(() {
+      _canScrollLeft = _controller.offset > 8;
+      _canScrollRight =
+          _controller.offset < _controller.position.maxScrollExtent - 8;
+    });
+  }
+
+  void _scrollBy(double delta) {
+    _controller.animateTo(
+      (_controller.offset + delta).clamp(
+        0.0,
+        _controller.position.maxScrollExtent,
+      ),
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cardWidth = widget.isMobile ? 150.0 : 180.0;
+
+    return Stack(
+      children: [
+        ListView.separated(
+          controller: _controller,
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 36),
+          itemCount: widget.subs.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 12),
+          itemBuilder: (context, i) => _SubVideoCard(
+            clip: widget.subs[i],
+            width: cardWidth,
+            onTap: () => widget.onTap(widget.subs[i]),
+          ),
+        ),
+        // Left arrow
+        if (_canScrollLeft)
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: _ArrowButton(
+                icon: Icons.chevron_left,
+                onTap: () => _scrollBy(-(cardWidth + 12) * 2),
+              ),
+            ),
+          ),
+        // Right arrow
+        if (_canScrollRight)
+          Positioned(
+            right: 0,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: _ArrowButton(
+                icon: Icons.chevron_right,
+                onTap: () => _scrollBy((cardWidth + 12) * 2),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ArrowButton extends StatefulWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _ArrowButton({required this.icon, required this.onTap});
+
+  @override
+  State<_ArrowButton> createState() => _ArrowButtonState();
+}
+
+class _ArrowButtonState extends State<_ArrowButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: _hovered
+                ? AppColors.carbon
+                : AppColors.carbon.withValues(alpha: 0.8),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: _hovered ? AppColors.signalGreen : AppColors.warmCharcoal,
+            ),
+          ),
+          child: Icon(
+            widget.icon,
+            size: 18,
+            color: _hovered ? AppColors.signalGreen : AppColors.fog,
+          ),
         ),
       ),
     );
