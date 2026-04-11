@@ -1,15 +1,9 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:web/web.dart' as web;
+import 'fullscreen_stub.dart'
+    if (dart.library.js_interop) 'fullscreen_web.dart'
+    as fullscreen_impl;
 
 /// Provides fullscreen toggle that works on web and is a no-op on mobile.
 class FullscreenService {
-  static void enterFullscreen() {
-    if (!kIsWeb) return;
-    web.document.documentElement?.requestFullscreen();
-  }
-
-  static void exitFullscreen() {
-    if (!kIsWeb) return;
-    web.document.exitFullscreen();
-  }
+  static void enterFullscreen() => fullscreen_impl.enterFullscreenImpl();
+  static void exitFullscreen() => fullscreen_impl.exitFullscreenImpl();
 }
