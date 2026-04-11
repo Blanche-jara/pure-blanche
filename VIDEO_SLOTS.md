@@ -44,13 +44,25 @@
 **description**: 청년 작가로 활동. 독립 영상, 실험 영화, 아트 필름 등 개인 창작 중심.
 
 ### 메인 영상
-- title: 메인 영상 | youtubeId: 
+- title: 인터뷰 BLANC | youtubeId: 7GxF4ae4vbQ
 
 ### 서브 영상
-1. title: 서브 영상 1 | youtubeId: L1vaet56r2U
-2. title: 서브 영상 2 | youtubeId: 
-3. title: 서브 영상 3 | youtubeId: 
-4. title: 서브 영상 4 | youtubeId: 
+1. title: [MAIN] Welcomed, by World | youtubeId: L1vaet56r2U
+2. title: [C-1] Cyberpunk is Simplebomb | youtubeId: UAOV2eLS8E8
+3. title: [C-2] Robots & Emotions | youtubeId: lWTuIR2fvWo
+4. title: [C-3] 8Bit Appearance | youtubeId: sIXYfoVtrbY
+5. title: [C-4] 8Bit Logging in | youtubeId: GrYEi4pQvNg
+6. title: [C-5] Somebody is Watching You | youtubeId: CGVvcWqbiN0
+7. title: [C-6] Draftsman | youtubeId: K6AIH9daD6A
+8. title: [C-7] Re-fused | youtubeId: 6J05dyuNpdI
+9. title: [C-8] Target Locked | youtubeId: k_0N5KN258o
+10. title: [A-1] Search for it | youtubeId: 4FQduBI7158
+11. title: [A-2] Blanc Always Shines | youtubeId: Lqlkg1LCiUE
+12. title: [A-3] The Cubes of Character | youtubeId: 4brmEBZ3fCg
+13. title: [A-4] The Way You See | youtubeId: KHd25it2qeA
+14. title: [A-5] Oppression | youtubeId: Wp9tyFH5DSg
+15. title: [A-7] LetterQuakes_2 | youtubeId: eGE-3o5rVNY
+16. title: 인터뷰Blanc | youtubeId: 1EeuBWSunt0
 
 ## 2023
 **label**: 지자체 외주

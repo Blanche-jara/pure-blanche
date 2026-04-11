@@ -10,7 +10,13 @@
       "Bash(mkdir -p /c/Users/Blanche/Desktop/Code/pure-blanche/assets)",
       "Bash(cp /c/Users/Blanche/Desktop/Code/pure-blanche/design/Blanche_Logo.png /c/Users/Blanche/Desktop/Code/pure-blanche/assets/)",
       "Bash(xxd /c/Users/Blanche/Desktop/Code/pure-blanche/assets/Blanche_Logo.png)",
-      "Bash(flutter clean:*)"
+      "Bash(flutter clean:*)",
+      "Bash(curl -s 'https://noembed.com/embed?url=https://www.youtube.com/watch?v=__TRACKED_VAR__')",
+      "Bash(curl -s \"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=7GxF4ae4vbQ&format=json\")",
+      "Bash(curl -s 'https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=__TRACKED_VAR__&format=json')",
+      "Bash(python -c ':*)",
+      "Bash(python3 -c \"print\\('\\\\uc778\\\\ud130\\\\ubdf0 BLANC'\\); print\\('\\\\uc778\\\\ud130\\\\ubdf0Blanc'\\)\")",
+      "Bash(python -c \"print\\(u'\\\\uc778\\\\ud130\\\\ubdf0 BLANC'\\); print\\(u'\\\\uc778\\\\ud130\\\\ubdf0Blanc'\\)\")"
     ]
   }
 }
