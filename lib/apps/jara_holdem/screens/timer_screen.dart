@@ -33,6 +33,7 @@ class _TimerScreenState extends State<TimerScreen> {
               ? const Color(0xFF1A1500)
               : const Color(0xFF0A1A0A),
       body: SafeArea(
+        bottom: false,
         child: Column(
           children: [
             // Top bar: tournament name + current time
