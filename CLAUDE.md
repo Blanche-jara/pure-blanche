@@ -5,13 +5,15 @@ Blanche의 유틸리티 집합소 웹사이트. Flutter Web으로 구축.
 
 ## Tech Stack
 
-- **Framework**: Flutter 3.38.7 (Web only)
-- **Language**: Dart 3.10.7
+- **Framework**: Flutter 3.41.6 (Web only)
+- **Language**: Dart 3.11.4
 - **State**: Provider (jara-holdem), setState (roulette, guestbook)
 - **Storage**: SharedPreferences (브라우저 localStorage — 사용자별 독립)
 - **Fonts**: Google Fonts (Inter), system-ui (headings), Consolas (code)
 - **Design System**: `design/DESIGN.md` 기반 — VoltAgent-inspired dark theme
-- **Dependencies**: provider, audioplayers, shared_preferences, intl, web, google_fonts
+- **Deployment**: GitHub Pages + GitHub Actions (`.github/workflows/deploy.yml`)
+- **Domain**: `pure-blanche.com` (Cloudflare DNS → GitHub Pages)
+- **Dependencies**: provider, audioplayers, shared_preferences, intl, web, google_fonts, pointer_interceptor, url_launcher
 
 ## Design Tokens (Quick Ref)
 
@@ -71,12 +73,20 @@ pure-blanche/
 │       ├── projects_section.dart
 │       ├── contact_section.dart
 │       └── footer_section.dart
+├── assets/
+│   └── Blanche_Logo.png           # 메인 페이지 로고 (흰색, 투명 배경)
 ├── web/
 │   ├── index.html                 # Flutter web 엔트리
+│   ├── CNAME                      # GitHub Pages 커스텀 도메인 (pure-blanche.com)
+│   ├── assets/
+│   │   └── Blanche_Animation.mp4  # 인트로 영상 (~9MB)
 │   └── apps/
 │       ├── jamakase/index.html + BG.mp3   # Jamakase Notify (HTML 프로젝트)
 │       ├── birthday/index.html            # 생일 선물 리스트 (HTML 프로젝트)
 │       └── video-player.html              # Google Drive preview iframe 래퍼
+├── .github/
+│   └── workflows/
+│       └── deploy.yml             # GitHub Actions: Flutter 빌드 → Pages 배포
 └── pubspec.yaml
 ```
 
@@ -84,10 +94,10 @@ pure-blanche/
 
 | Path | Page | 설명 |
 |------|------|------|
-| `/` | `MainPage` | 히어로 + 3개 네비게이션 카드 (Code / Video / Guestbook) |
+| `/` | `MainPage` | 2-page 스냅 스크롤: 히어로 소개 (Page 0) + 3개 네비카드 & 푸터 (Page 1). 첫 접속 시 인트로 영상 재생 (sessionStorage 기반) |
 | `/code` | `CodeProjectsPage` | 4개 프로젝트 카드 → 클릭 시 각 앱 실행 |
 | `/video` | `VideoProjectsPage` | 영상 연대표 (7개 시대, 풀페이지 스냅) |
-| `/guestbook` | `GuestbookPage` | 방명록 입력/표시 (로컬 state) |
+| `/guestbook` | `GuestbookPage` | 방명록 입력/표시 (로컬 state) — 현재 공사중 오버레이 |
 | `/app/jara-holdem` | `AppWrapper` + `JaraHoldemApp` | 포커 토너먼트 타이머 |
 | `/app/roulette` | `AppWrapper` + `RouletteAppEntry` | 자마카세 인원뽑기 룰렛 |
 | `/app/jamakase` | `HtmlAppPage` | Jamakase Notify (iframe) |
@@ -120,10 +130,19 @@ flutter build web             # 프로덕션 빌드 → build/web/
 - `lib/sections/`는 구버전 싱글페이지 구조의 잔재 — 정리 대상
 - `lib/widgets/drive_video_player.dart`는 미사용 (YouTube로 전환됨) — 정리 대상
 
+## Main Page Architecture
+
+- 2-page 스냅: `PageView` vertical (Page 0: 히어로, Page 1: 카드+푸터)
+- 인트로 영상: `sessionStorage` 기반 첫 접속 판별. HTML `<video>` 요소로 자동재생 (muted)
+- 인트로 흐름: 영상 재생 → 800ms 페이드아웃 → 메인 화면 1000ms 페이드인
+- ESC 키로 영상 스킵 가능. 영상 중 마우스/키보드 입력 차단 (`IgnorePointer` + `Focus`)
+
 ## Video Page Architecture
 
 - 풀페이지 스냅: `PageView` vertical + `NeverScrollableScrollPhysics` + `Listener`로 스크롤 가로채기
 - 스크롤 쿨다운: 800ms 락 (한 번 스크롤 = 한 챕터 전환)
 - 인트로 애니메이션: 2.8초 3-phase (연대표 중앙 등장 → 좌측 슬라이드 → 콘텐츠 페이드인)
 - 서브 영상 스트립: 가로 스크롤 + ← → 화살표 페이지네이션
+- 서브 영상 팝업: `showDialog` (barrierDismissible: true) — 바깥 클릭으로 닫기 가능
+- 메인 영상 iframe 스크롤: `pointer_interceptor`로 iframe 이벤트 가로채기
 - 데이터 관리: `VIDEO_SLOTS.md` → `_eras` 배열 수동 동기화

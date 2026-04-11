@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
 import '../theme/app_colors.dart';
 import '../widgets/youtube_player.dart';
 
@@ -265,6 +266,7 @@ class _VideoProjectsPageState extends State<VideoProjectsPage>
   void _showVideoPopup(BuildContext context, _VideoClip clip) {
     showDialog(
       context: context,
+      barrierDismissible: true,
       builder: (_) => _VideoPopup(clip: clip),
     );
   }
@@ -767,18 +769,26 @@ class _HeroVideoState extends State<_HeroVideo> {
   Widget build(BuildContext context) {
     // If youtubeId exists, show embedded player
     if (widget.clip.hasVideo) {
-      return Container(
-        width: double.infinity,
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: AppColors.carbon,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.warmCharcoal),
-        ),
-        child: YoutubePlayer(
-          youtubeId: widget.clip.youtubeId!,
-          autoplay: true,
-        ),
+      return Stack(
+        children: [
+          Container(
+            width: double.infinity,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: AppColors.carbon,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.warmCharcoal),
+            ),
+            child: YoutubePlayer(
+              youtubeId: widget.clip.youtubeId!,
+              autoplay: true,
+            ),
+          ),
+          // Intercept pointer events from iframe so scroll reaches PageView
+          Positioned.fill(
+            child: PointerInterceptor(child: SizedBox.expand()),
+          ),
+        ],
       );
     }
 
