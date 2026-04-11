@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Entry widget for Roulette App.
 /// Wraps in its own Theme so it keeps its original look.
@@ -29,9 +31,39 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  static const _storageKey = 'roulette_items';
   final List<String> _items = [];
   final TextEditingController _textController = TextEditingController();
   int _pickCount = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadItems();
+  }
+
+  Future<void> _loadItems() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getString(_storageKey);
+    if (data != null) {
+      final decoded = jsonDecode(data) as Map<String, dynamic>;
+      setState(() {
+        _items.addAll((decoded['items'] as List).cast<String>());
+        _pickCount = (decoded['pickCount'] as int?) ?? 1;
+        if (_pickCount > _items.length && _items.isNotEmpty) {
+          _pickCount = _items.length;
+        }
+      });
+    }
+  }
+
+  Future<void> _saveItems() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _storageKey,
+      jsonEncode({'items': _items, 'pickCount': _pickCount}),
+    );
+  }
 
   void _addItem() {
     final text = _textController.text.trim();
@@ -51,6 +83,15 @@ class _HomePageState extends State<HomePage> {
       _items.add(text);
       _textController.clear();
     });
+    _saveItems();
+  }
+
+  void _clearAll() {
+    setState(() {
+      _items.clear();
+      _pickCount = 1;
+    });
+    _saveItems();
   }
 
   void _removeItem(int index) {
@@ -60,6 +101,7 @@ class _HomePageState extends State<HomePage> {
         _pickCount = _items.length;
       }
     });
+    _saveItems();
   }
 
   void _startRoulette() {
@@ -248,6 +290,27 @@ class _HomePageState extends State<HomePage> {
                                 ' / 30명 (최소 2명)',
                                 style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
                               ),
+                              if (_items.isNotEmpty) ...[
+                                const Spacer(),
+                                GestureDetector(
+                                  onTap: _clearAll,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.shade50,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      '전체 삭제',
+                                      style: TextStyle(
+                                        color: Colors.red.shade400,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -372,6 +435,7 @@ class _HomePageState extends State<HomePage> {
                                       onChanged: (value) {
                                         if (value != null) {
                                           setState(() => _pickCount = value);
+                                          _saveItems();
                                         }
                                       },
                                     ),
