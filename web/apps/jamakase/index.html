@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta name="robots" content="noindex, nofollow"/>
+<title>Jamakase Notify</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600&amp;family=Noto+Sans+KR:wght@300;400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#D4AF37",
+                        "background-light": "#f6f8f6",
+                        "background-dark": "#1a1a1a",
+                        "surface-dark": "#2a2a2a",
+                        "gold-light": "#e4c56e",
+                        "gold-dark": "#a2862c"
+                    },
+                    fontFamily: {
+                        "display": ["Crimson Pro", "Noto Sans KR", "serif"],
+                        "sans": ["Noto Sans KR", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    backgroundImage: {
+                        'japanese-pattern': "url('https://www.transparenttextures.com/patterns/dark-fish-skin.png')",
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Crimson Pro', 'Noto Sans KR', serif;
+        }
+        .font-sans {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-gray-300">
+<div class="relative flex min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+<div class="absolute inset-0 z-0 bg-japanese-pattern bg-repeat opacity-10"></div>
+<div class="relative z-10 layout-container flex h-full grow flex-col">
+<header class="flex items-center justify-center px-4 sm:px-6 lg:px-8 py-4">
+<div class="flex w-full max-w-4xl items-center justify-between">
+<div class="flex items-center gap-3 text-gold-light">
+<div class="size-6">
+<svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path d="M4 42.4379C4 42.4379 14.0962 36.0744 24 41.1692C35.0664 46.8624 44 42.2078 44 42.2078L44 7.01134C44 7.01134 35.068 11.6577 24.0031 5.96913C14.0971 0.876274 4 7.27094 4 7.27094L4 42.4379Z" fill="currentColor"></path>
+</svg>
+</div>
+<h2 class="text-xl font-semibold tracking-wider font-sans">Jamakase Notify</h2>
+</div>
+<div class="flex items-center gap-4">
+<button id="audioToggle" class="flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-gray-700 bg-surface-dark text-gray-400 hover:text-gold-light transition-colors">
+<span class="material-symbols-outlined text-xl">
+                                volume_up
+                            </span>
+</button>
+</div>
+</div>
+</header>
+<main class="flex flex-1 justify-center px-4 sm:px-6 lg:px-8 py-10 sm:py-20">
+<div class="flex w-full max-w-2xl flex-col items-center gap-12">
+<div class="w-full rounded-lg border border-gold-dark/30 bg-surface-dark/50 p-10 sm:p-16 text-center shadow-2xl shadow-black/30 backdrop-blur-sm">
+<div class="flex w-full flex-col items-center justify-center gap-6">
+<div class="grid w-full grid-cols-1 divide-y divide-gold-dark/30 text-gold-light sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+<div class="flex flex-col justify-center gap-2 p-4">
+<h3 class="text-xs tracking-widest text-gold-dark uppercase">Date</h3>
+<p class="text-2xl font-light leading-tight font-display text-gray-300">2025년 12월 19일</p>
+</div>
+<div class="flex flex-col justify-center gap-2 p-4">
+<h1 class="text-6xl font-semibold tracking-wide">8th</h1>
+<h3 class="text-sm tracking-widest text-gold-dark uppercase">자마카세</h3>
+</div>
+<div class="flex flex-col justify-center gap-2 p-4">
+<h3 class="text-xs tracking-widest text-gold-dark uppercase">Location</h3>
+<p class="text-2xl font-light leading-tight font-display text-gray-300">홍대 스토리라운지</p>
+<a href="https://naver.me/5f5XLrRO" target="_blank" rel="noopener noreferrer" class="font-sans mt-4 text-sm font-semibold tracking-wider text-gold-light underline underline-offset-4 decoration-gold-dark/50 hover:text-white hover:decoration-gold-light transition-colors inline-block cursor-pointer">약도 보기 (View Map)</a>
+</div>
+</div>
+</div>
+</div>
+<div class="flex w-full max-w-md flex-col items-center gap-8">
+<a href="https://forms.gle/PfSVafNNyfNMeHFj9" target="_blank" rel="noopener noreferrer" class="font-sans flex w-full max-w-xs min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-md h-12 px-5 bg-transparent border border-gold-dark text-gold-light text-base font-bold leading-normal tracking-wider transition-all hover:bg-gold-dark hover:text-background-dark hover:shadow-lg hover:shadow-gold-dark/20">
+<span class="truncate">참여자 설문 조사</span>
+</a>
+<div class="text-center font-sans text-gray-400">
+<h4 class="text-lg font-semibold tracking-wide text-gold-light mb-4">Jamakase</h4>
+<div class="text-sm leading-relaxed space-y-4">
+<p>‘자마카세’는 요리 주최자 <strong class="font-semibold text-gray-300">자라(Jara)</strong>와 <strong class="font-semibold text-gray-300">오마카세(Omakase)</strong>의 합성어로, 자라가 직접 자신 있는 메뉴를 엄선해 지인들을 위해 선보이는 프라이빗 코스 다이닝입니다.</p>
+<p>기존의 오마카세가 미묘한 감질과 여백의 미를 강조했다면, 자마카세는 ‘배부름’ 그 자체를 최고의 만족으로 여깁니다. 이에 따라 식전 요리(Entrée)는 최소화하고, 메인 디쉬인 <strong class="font-semibold text-gray-300">Poisson(생선), Porc(돼지고기), Bœuf(소고기)</strong>를 중심으로 풍성하고 밀도 높은 한 끼를 구성했습니다.</p>
+<p>감질나는 코스가 아닌, 마지막 한입까지 완전한 포만감과 주최자의 철학이 담긴 코스. 그것이 바로 자마카세입니다.</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+<audio id="bgAudio" loop>
+    <source src="BG.mp3" type="audio/mpeg">
+</audio>
+<script>
+    const audio = document.getElementById('bgAudio');
+    const audioToggle = document.getElementById('audioToggle');
+    const iconSpan = audioToggle.querySelector('span');
+    let isPlaying = false;
+    let userInteracted = false;
+
+    // 오디오 미리 로드
+    audio.preload = 'auto';
+    audio.volume = 1.0;
+
+    // 페이지 로드 시 즉시 재생 시도
+    window.addEventListener('DOMContentLoaded', () => {
+        // 즉시 재생 시도
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+            playPromise.then(() => {
+                isPlaying = true;
+                iconSpan.textContent = 'volume_up';
+                userInteracted = true;
+            }).catch(() => {
+                // 자동 재생 차단 시, 사용자 인터랙션 대기
+                isPlaying = false;
+                iconSpan.textContent = 'volume_off';
+            });
+        }
+    });
+
+    // 사용자 인터랙션 감지 후 자동 재생 (한 번만 실행)
+    const startAudioOnInteraction = () => {
+        if (!userInteracted && !isPlaying) {
+            audio.play().then(() => {
+                isPlaying = true;
+                iconSpan.textContent = 'volume_up';
+                userInteracted = true;
+                // 이벤트 리스너 제거
+                removeInteractionListeners();
+            }).catch(() => {
+                // 재생 실패해도 계속 시도
+            });
+        }
+    };
+
+    // 인터랙션 리스너 제거 함수
+    const removeInteractionListeners = () => {
+        document.removeEventListener('click', startAudioOnInteraction);
+        document.removeEventListener('touchstart', startAudioOnInteraction);
+        document.removeEventListener('keydown', startAudioOnInteraction);
+    };
+
+    // 여러 인터랙션 이벤트 리스너 추가
+    document.addEventListener('click', startAudioOnInteraction, { once: true });
+    document.addEventListener('touchstart', startAudioOnInteraction, { once: true });
+    document.addEventListener('keydown', startAudioOnInteraction, { once: true });
+
+    // 토글 버튼 클릭 이벤트
+    audioToggle.addEventListener('click', (e) => {
+        e.stopPropagation(); // 이벤트 전파 방지
+        userInteracted = true;
+        if (isPlaying) {
+            audio.pause();
+            isPlaying = false;
+            iconSpan.textContent = 'volume_off';
+        } else {
+            audio.play().then(() => {
+                isPlaying = true;
+                iconSpan.textContent = 'volume_up';
+            }).catch(error => {
+                console.log('오디오 재생 실패:', error);
+            });
+        }
+    });
+
+    // 오디오 상태 동기화
+    audio.addEventListener('play', () => {
+        isPlaying = true;
+        iconSpan.textContent = 'volume_up';
+    });
+
+    audio.addEventListener('pause', () => {
+        isPlaying = false;
+        iconSpan.textContent = 'volume_off';
+    });
+</script>
+</body></html>
