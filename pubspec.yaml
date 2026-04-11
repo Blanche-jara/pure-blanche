@@ -57,9 +57,14 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "design/BHT_icon.png"
-  adaptive_icon_background: "#0A1A0A"
-  adaptive_icon_foreground: "design/BHT_icon.png"
+  image_path: "design/Blanche_Logo_Dark.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "design/Blanche_Logo_Dark.png"
+  web:
+    generate: true
+    image_path: "design/Blanche_Logo_Dark.png"
+    background_color: "#FFFFFF"
+    theme_color: "#050507"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

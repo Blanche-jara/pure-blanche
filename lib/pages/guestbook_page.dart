@@ -51,7 +51,9 @@ class _GuestbookPageState extends State<GuestbookPage> {
   Widget build(BuildContext context) {
     return PageScaffold(
       title: 'Guestbook',
-      body: Column(
+      body: Stack(
+        children: [
+          Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
@@ -157,6 +159,47 @@ class _GuestbookPageState extends State<GuestbookPage> {
               ),
             );
           }),
+        ],
+      ),
+          // Under construction overlay
+          Positioned.fill(
+            child: Container(
+              color: AppColors.abyss.withValues(alpha: 0.85),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.construction,
+                      size: 48,
+                      color: AppColors.signalGreen,
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      '공사중',
+                      style: TextStyle(
+                        fontFamily: 'Segoe UI',
+                        fontSize: 28,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.snow,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '현재 페이지를 준비하고 있습니다.\n빠른 시일 내에 찾아뵙겠습니다.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 15,
+                        height: 1.6,
+                        color: AppColors.parchment,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

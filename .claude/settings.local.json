@@ -22,7 +22,8 @@
       "Bash(nslookup www.pure-blanche.com)",
       "Bash(dig www.pure-blanche.com +short)",
       "Bash(curl -sI https://pure-blanche.com)",
-      "Bash(curl -sI http://pure-blanche.com)"
+      "Bash(curl -sI http://pure-blanche.com)",
+      "Bash(gh run:*)"
     ]
   }
 }
