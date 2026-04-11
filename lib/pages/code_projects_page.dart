@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:web/web.dart' as web;
 import '../theme/app_colors.dart';
 import '../widgets/page_scaffold.dart';
 
@@ -82,6 +83,7 @@ class _ProjectData {
   final IconData icon;
   final String type; // "flutter" | "web"
   final String route;
+  final String? downloadUrl;
 
   const _ProjectData({
     required this.title,
@@ -92,6 +94,7 @@ class _ProjectData {
     required this.icon,
     required this.type,
     required this.route,
+    this.downloadUrl,
   });
 }
 
@@ -112,6 +115,7 @@ const _projects = [
     icon: Icons.style_outlined,
     type: 'flutter',
     route: '/app/jara-holdem',
+    downloadUrl: 'https://drive.google.com/file/d/1UsKiAJHPsZe6JUVeP9EOWsg511bBOVSg/view?usp=sharing',
   ),
   _ProjectData(
     title: '자마카세 인원뽑기',
@@ -214,7 +218,7 @@ class _CodeProjectCardState extends State<_CodeProjectCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header row: icon + type badge
+            // Header row: icon + download + type badge
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -223,7 +227,15 @@ class _CodeProjectCardState extends State<_CodeProjectCard> {
                   size: 32,
                   color: _hovered ? AppColors.signalGreen : AppColors.steel,
                 ),
-                _TypeBadge(type: p.type),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (p.downloadUrl != null)
+                      _DownloadButton(url: p.downloadUrl!),
+                    if (p.downloadUrl != null) const SizedBox(width: 8),
+                    _TypeBadge(type: p.type),
+                  ],
+                ),
               ],
             ),
             const SizedBox(height: 20),
@@ -315,6 +327,69 @@ class _CodeProjectCardState extends State<_CodeProjectCard> {
 // ---------------------------------------------------------------------------
 // Small widgets
 // ---------------------------------------------------------------------------
+
+class _DownloadButton extends StatefulWidget {
+  final String url;
+  const _DownloadButton({required this.url});
+
+  @override
+  State<_DownloadButton> createState() => _DownloadButtonState();
+}
+
+class _DownloadButtonState extends State<_DownloadButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => web.window.open(widget.url, '_blank'),
+          borderRadius: BorderRadius.circular(6),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: _hovered
+                  ? AppColors.signalGreen.withValues(alpha: 0.12)
+                  : Colors.transparent,
+              border: Border.all(
+                color: _hovered
+                    ? AppColors.signalGreen.withValues(alpha: 0.4)
+                    : AppColors.warmCharcoal,
+              ),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.download_rounded,
+                  size: 14,
+                  color: _hovered ? AppColors.signalGreen : AppColors.steel,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'APK',
+                  style: TextStyle(
+                    fontFamily: 'Consolas',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: _hovered ? AppColors.signalGreen : AppColors.steel,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _TypeBadge extends StatelessWidget {
   final String type;
