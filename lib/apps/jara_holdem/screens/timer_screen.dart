@@ -32,9 +32,7 @@ class _TimerScreenState extends State<TimerScreen> {
           : isBreak
               ? const Color(0xFF1A1500)
               : const Color(0xFF0A1A0A),
-      body: SafeArea(
-        bottom: false,
-        child: Column(
+      body: Column(
           children: [
             // Top bar: tournament name + current time
             _buildTopBar(provider),
@@ -69,7 +67,6 @@ class _TimerScreenState extends State<TimerScreen> {
             ),
           ],
         ),
-      ),
     );
   }
 

@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'apps/jara_holdem/jara_holdem_app.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Lock landscape + hide all system UI
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
+  ]);
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   runApp(const BHTApp());
 }
 

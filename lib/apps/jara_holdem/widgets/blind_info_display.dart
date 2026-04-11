@@ -11,8 +11,8 @@ class BlindInfoDisplay extends StatelessWidget {
     final provider = context.watch<TournamentProvider>();
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    final infoFontSize = (screenWidth * 0.07).clamp(28.0, 80.0).clamp(28.0, screenHeight * 0.07);
-    final nextFontSize = (screenWidth * 0.03).clamp(14.0, 32.0).clamp(14.0, screenHeight * 0.03);
+    final infoFontSize = (screenWidth * 0.07).clamp(20.0, 80.0).clamp(20.0, (screenHeight * 0.07).clamp(20.0, 80.0));
+    final nextFontSize = (screenWidth * 0.03).clamp(10.0, 32.0).clamp(10.0, (screenHeight * 0.03).clamp(10.0, 32.0));
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -66,17 +66,20 @@ class BlindInfoDisplay extends StatelessWidget {
   }
 
   Widget _buildBlindRow(BlindLevel level, double fontSize) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _buildChip('SB', _formatNumber(level.smallBlind), fontSize, Colors.blue),
-        _buildSlash(fontSize),
-        _buildChip('BB', _formatNumber(level.bigBlind), fontSize, Colors.green),
-        if (level.ante > 0) ...[
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _buildChip('SB', _formatNumber(level.smallBlind), fontSize, Colors.blue),
           _buildSlash(fontSize),
-          _buildChip('ANTE', _formatNumber(level.ante), fontSize, Colors.orange),
+          _buildChip('BB', _formatNumber(level.bigBlind), fontSize, Colors.green),
+          if (level.ante > 0) ...[
+            _buildSlash(fontSize),
+            _buildChip('ANTE', _formatNumber(level.ante), fontSize, Colors.orange),
+          ],
         ],
-      ],
+      ),
     );
   }
 
@@ -121,31 +124,34 @@ class BlindInfoDisplay extends StatelessWidget {
   }
 
   Widget _buildNextInfo(BlindLevel next, double fontSize, bool currentIsBreak) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          currentIsBreak ? 'NEXT:  ' : 'NEXT:  ',
-          style: TextStyle(fontSize: fontSize, color: Colors.white38),
-        ),
-        Text(
-          'SB ${_formatNumber(next.smallBlind)}  /  BB ${_formatNumber(next.bigBlind)}',
-          style: TextStyle(
-            fontSize: fontSize,
-            color: Colors.white60,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        if (next.ante > 0)
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
           Text(
-            '  /  Ante ${_formatNumber(next.ante)}',
+            'NEXT:  ',
+            style: TextStyle(fontSize: fontSize, color: Colors.white38),
+          ),
+          Text(
+            'SB ${_formatNumber(next.smallBlind)}  /  BB ${_formatNumber(next.bigBlind)}',
             style: TextStyle(
               fontSize: fontSize,
               color: Colors.white60,
               fontWeight: FontWeight.w500,
             ),
           ),
-      ],
+          if (next.ante > 0)
+            Text(
+              '  /  Ante ${_formatNumber(next.ante)}',
+              style: TextStyle(
+                fontSize: fontSize,
+                color: Colors.white60,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+        ],
+      ),
     );
   }
 
