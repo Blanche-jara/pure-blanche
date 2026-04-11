@@ -97,20 +97,96 @@ class VideoProjectsPage extends StatefulWidget {
   State<VideoProjectsPage> createState() => _VideoProjectsPageState();
 }
 
-class _VideoProjectsPageState extends State<VideoProjectsPage> {
+class _VideoProjectsPageState extends State<VideoProjectsPage>
+    with TickerProviderStateMixin {
   late final PageController _pageController;
   int _currentPage = 0;
   bool _scrollLocked = false;
   static const _scrollCooldown = Duration(milliseconds: 800);
 
+  // Intro animation
+  bool _introPlaying = true;
+  late final AnimationController _introController;
+  late final Animation<double> _introTimelineScale;
+  late final Animation<double> _introTimelineOpacity;
+  late final Animation<Alignment> _introTimelineAlign;
+  late final Animation<double> _introSidebarSlide;
+  late final Animation<double> _introContentFade;
+
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
+
+    _introController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2800),
+    );
+
+    // Phase 1 (0~0.45): big timeline in center
+    // Phase 2 (0.45~0.75): shrink & slide to left
+    // Phase 3 (0.75~1.0): content fades in
+
+    _introTimelineOpacity = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0, end: 1), weight: 20),
+      TweenSequenceItem(tween: ConstantTween(1), weight: 80),
+    ]).animate(CurvedAnimation(parent: _introController, curve: Curves.easeOut));
+
+    _introTimelineScale = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.5, end: 1.5), weight: 45),
+      TweenSequenceItem(
+        tween: Tween(begin: 1.5, end: 1.0)
+            .chain(CurveTween(curve: Curves.easeInOutCubic)),
+        weight: 30,
+      ),
+      TweenSequenceItem(tween: ConstantTween(1.0), weight: 25),
+    ]).animate(_introController);
+
+    _introTimelineAlign = TweenSequence<Alignment>([
+      TweenSequenceItem(
+          tween: ConstantTween(Alignment.center), weight: 45),
+      TweenSequenceItem(
+        tween: AlignmentTween(begin: Alignment.center, end: Alignment.centerLeft)
+            .chain(CurveTween(curve: Curves.easeInOutCubic)),
+        weight: 30,
+      ),
+      TweenSequenceItem(
+          tween: ConstantTween(Alignment.centerLeft), weight: 25),
+    ]).animate(_introController);
+
+    _introSidebarSlide = TweenSequence<double>([
+      TweenSequenceItem(tween: ConstantTween(-200), weight: 60),
+      TweenSequenceItem(
+        tween: Tween(begin: -200.0, end: 0.0)
+            .chain(CurveTween(curve: Curves.easeOutCubic)),
+        weight: 40,
+      ),
+    ]).animate(_introController);
+
+    _introContentFade = TweenSequence<double>([
+      TweenSequenceItem(tween: ConstantTween(0), weight: 70),
+      TweenSequenceItem(
+        tween: Tween(begin: 0.0, end: 1.0)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 30,
+      ),
+    ]).animate(_introController);
+
+    _introController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        setState(() => _introPlaying = false);
+      }
+    });
+
+    // Small delay then play
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) _introController.forward();
+    });
   }
 
   @override
   void dispose() {
+    _introController.dispose();
     _pageController.dispose();
     super.dispose();
   }
@@ -154,16 +230,117 @@ class _VideoProjectsPageState extends State<VideoProjectsPage> {
 
     return Scaffold(
       backgroundColor: AppColors.abyss,
-      body: Column(
-        children: [
-          _buildTopBar(context, isMobile),
-          Expanded(
-            child: isMobile
-                ? _buildMobileBody()
-                : _buildDesktopBody(),
-          ),
-        ],
+      body: AnimatedBuilder(
+        animation: _introController,
+        builder: (context, _) {
+          if (_introPlaying && !isMobile) {
+            return _buildIntroOverlay(context, isMobile);
+          }
+          return Column(
+            children: [
+              // Top bar fades in
+              FadeTransition(
+                opacity: _introContentFade,
+                child: _buildTopBar(context, isMobile),
+              ),
+              Expanded(
+                child: isMobile
+                    ? FadeTransition(
+                        opacity: _introContentFade,
+                        child: _buildMobileBody(),
+                      )
+                    : _buildDesktopBodyWithIntro(),
+              ),
+            ],
+          );
+        },
       ),
+    );
+  }
+
+  /// Full-screen intro: big timeline in center, then shrinks to sidebar
+  Widget _buildIntroOverlay(BuildContext context, bool isMobile) {
+    return Stack(
+      children: [
+        // The big centered timeline that scales & moves
+        Align(
+          alignment: _introTimelineAlign.value,
+          child: Opacity(
+            opacity: _introTimelineOpacity.value,
+            child: Transform.scale(
+              scale: _introTimelineScale.value,
+              child: SizedBox(
+                width: 200,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(_eras.length, (i) {
+                    return _IntroTimelineItem(
+                      era: _eras[i],
+                      isFirst: i == 0,
+                      isLast: i == _eras.length - 1,
+                    );
+                  }),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Desktop body with sidebar slide-in & content fade-in after intro
+  Widget _buildDesktopBodyWithIntro() {
+    return Row(
+      children: [
+        // Sidebar slides in from left
+        Transform.translate(
+          offset: Offset(_introSidebarSlide.value, 0),
+          child: Container(
+            width: 200,
+            decoration: const BoxDecoration(
+              border: Border(right: BorderSide(color: AppColors.warmCharcoal)),
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 40),
+                Expanded(
+                  child: _TimelineRail(
+                    eras: _eras,
+                    activeIndex: _currentPage,
+                    onTap: _goToPage,
+                  ),
+                ),
+                const SizedBox(height: 40),
+              ],
+            ),
+          ),
+        ),
+        // Content fades in
+        Expanded(
+          child: FadeTransition(
+            opacity: _introContentFade,
+            child: Listener(
+              onPointerSignal: (event) {
+                if (event is PointerScrollEvent) {
+                  _onScroll(event.scrollDelta.dy);
+                }
+              },
+              child: PageView.builder(
+                controller: _pageController,
+                scrollDirection: Axis.vertical,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _eras.length,
+                onPageChanged: (i) => setState(() => _currentPage = i),
+                itemBuilder: (context, i) => _EraPage(
+                  era: _eras[i],
+                  onSubTap: (clip) => _showVideoPopup(context, clip),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -209,56 +386,6 @@ class _VideoProjectsPageState extends State<VideoProjectsPage> {
           ),
         ],
       ),
-    );
-  }
-
-  // ---- Desktop: left timeline + right PageView ----
-
-  Widget _buildDesktopBody() {
-    return Row(
-      children: [
-        // Left timeline rail
-        Container(
-          width: 200,
-          decoration: const BoxDecoration(
-            border: Border(right: BorderSide(color: AppColors.warmCharcoal)),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 40),
-              Expanded(
-                child: _TimelineRail(
-                  eras: _eras,
-                  activeIndex: _currentPage,
-                  onTap: _goToPage,
-                ),
-              ),
-              const SizedBox(height: 40),
-            ],
-          ),
-        ),
-        // Right: full-page snap (scroll hijacked)
-        Expanded(
-          child: Listener(
-            onPointerSignal: (event) {
-              if (event is PointerScrollEvent) {
-                _onScroll(event.scrollDelta.dy);
-              }
-            },
-            child: PageView.builder(
-              controller: _pageController,
-              scrollDirection: Axis.vertical,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _eras.length,
-              onPageChanged: (i) => setState(() => _currentPage = i),
-              itemBuilder: (context, i) => _EraPage(
-                era: _eras[i],
-                onSubTap: (clip) => _showVideoPopup(context, clip),
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -882,6 +1009,94 @@ class _VideoPopup extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Intro timeline item (centered, large)
+// ---------------------------------------------------------------------------
+
+class _IntroTimelineItem extends StatelessWidget {
+  final _Era era;
+  final bool isFirst;
+  final bool isLast;
+
+  const _IntroTimelineItem({
+    required this.era,
+    required this.isFirst,
+    required this.isLast,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 72,
+      child: Row(
+        children: [
+          const SizedBox(width: 28),
+          SizedBox(
+            width: 20,
+            child: Column(
+              children: [
+                Expanded(
+                  child: Container(
+                    width: isFirst ? 0 : 1,
+                    color: AppColors.warmCharcoal,
+                  ),
+                ),
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.signalGreen,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.signalGreen.withValues(alpha: 0.5),
+                        blurRadius: 8,
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Container(
+                    width: isLast ? 0 : 1,
+                    color: AppColors.warmCharcoal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  era.year,
+                  style: const TextStyle(
+                    fontFamily: 'Consolas',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.signalGreen,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  era.label,
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    color: AppColors.parchment,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
