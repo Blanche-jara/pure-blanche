@@ -1,5 +1,8 @@
+import 'dart:js_interop';
+import 'dart:ui_web' as ui_web;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:web/web.dart' as web;
 import '../theme/app_colors.dart';
 
 class MainPage extends StatefulWidget {
@@ -9,15 +12,181 @@ class MainPage extends StatefulWidget {
   State<MainPage> createState() => _MainPageState();
 }
 
-class _MainPageState extends State<MainPage> {
+class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
+  // ── Page snap ──
   final PageController _pageController = PageController();
   bool _scrollLocked = false;
   int _currentPage = 0;
   static const _scrollCooldown = Duration(milliseconds: 800);
 
+  // ── Intro state ──
+  bool _showIntro = false;
+  bool _videoPlaying = false;
+  bool _videoFadingOut = false;
+  bool _heroAnimating = false;
+  bool _introDone = false;
+
+  // ── Hero stagger animations ──
+  late AnimationController _heroStaggerController;
+  late Animation<double> _glowFade;
+  late Animation<Offset> _glowSlide;
+  late Animation<double> _logoFade;
+  late Animation<Offset> _logoSlide;
+  late Animation<double> _titleFade;
+  late Animation<Offset> _titleSlide;
+  late Animation<double> _subtitleFade;
+  late Animation<Offset> _subtitleSlide;
+
+  // ── Video element ──
+  static const _videoViewType = 'intro-video-player';
+
+  @override
+  void initState() {
+    super.initState();
+    _setupHeroAnimations();
+    _checkFirstVisit();
+  }
+
+  void _setupHeroAnimations() {
+    _heroStaggerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+
+    // 1. Glow: 0.0 ~ 0.3
+    _glowFade = Tween(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _heroStaggerController,
+        curve: const Interval(0.0, 0.3, curve: Curves.easeOut),
+      ),
+    );
+    _glowSlide = Tween(begin: const Offset(0, 0.15), end: Offset.zero).animate(
+      CurvedAnimation(
+        parent: _heroStaggerController,
+        curve: const Interval(0.0, 0.3, curve: Curves.easeOut),
+      ),
+    );
+
+    // 2. Logo: 0.15 ~ 0.45
+    _logoFade = Tween(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _heroStaggerController,
+        curve: const Interval(0.15, 0.45, curve: Curves.easeOut),
+      ),
+    );
+    _logoSlide = Tween(begin: const Offset(0, 0.5), end: Offset.zero).animate(
+      CurvedAnimation(
+        parent: _heroStaggerController,
+        curve: const Interval(0.15, 0.45, curve: Curves.easeOut),
+      ),
+    );
+
+    // 3. Title: 0.3 ~ 0.65
+    _titleFade = Tween(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _heroStaggerController,
+        curve: const Interval(0.3, 0.65, curve: Curves.easeOut),
+      ),
+    );
+    _titleSlide = Tween(begin: const Offset(0, 0.5), end: Offset.zero).animate(
+      CurvedAnimation(
+        parent: _heroStaggerController,
+        curve: const Interval(0.3, 0.65, curve: Curves.easeOut),
+      ),
+    );
+
+    // 4. Subtitle + scroll: 0.5 ~ 0.85
+    _subtitleFade = Tween(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _heroStaggerController,
+        curve: const Interval(0.5, 0.85, curve: Curves.easeOut),
+      ),
+    );
+    _subtitleSlide =
+        Tween(begin: const Offset(0, 0.5), end: Offset.zero).animate(
+      CurvedAnimation(
+        parent: _heroStaggerController,
+        curve: const Interval(0.5, 0.85, curve: Curves.easeOut),
+      ),
+    );
+
+    _heroStaggerController.addStatusListener((status) {
+      if (status == AnimationStatus.completed && mounted) {
+        setState(() => _introDone = true);
+      }
+    });
+  }
+
+  void _checkFirstVisit() {
+    final storage = web.window.sessionStorage;
+    final visited = storage.getItem('intro_played');
+
+    if (visited == null) {
+      // First visit this session → play intro
+      storage.setItem('intro_played', '1');
+      _registerVideoView();
+      setState(() {
+        _showIntro = true;
+        _videoPlaying = true;
+      });
+    } else {
+      // Already visited → skip intro, show hero directly
+      setState(() => _introDone = true);
+      _heroStaggerController.value = 1.0;
+    }
+  }
+
+  void _registerVideoView() {
+    ui_web.platformViewRegistry.registerViewFactory(
+      _videoViewType,
+      (int viewId) {
+        final video =
+            web.document.createElement('video') as web.HTMLVideoElement;
+        video.src = 'assets/Blanche_Animation.mp4';
+        video.autoplay = true;
+        video.muted = true;
+        video.playsInline = true;
+        video.style.width = '100%';
+        video.style.height = '100%';
+        video.style.objectFit = 'cover';
+        video.style.backgroundColor = '#050507';
+
+        video.addEventListener(
+          'ended',
+          (web.Event e) {
+            _onVideoEnded();
+          }.toJS,
+        );
+
+        return video;
+      },
+    );
+  }
+
+  void _onVideoEnded() {
+    if (!mounted) return;
+    // Fade out video
+    setState(() {
+      _videoFadingOut = true;
+    });
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (!mounted) return;
+      setState(() {
+        _videoPlaying = false;
+        _videoFadingOut = false;
+        _heroAnimating = true;
+      });
+      // Start hero stagger animation
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) _heroStaggerController.forward();
+      });
+    });
+  }
+
   @override
   void dispose() {
     _pageController.dispose();
+    _heroStaggerController.dispose();
     super.dispose();
   }
 
@@ -36,7 +205,7 @@ class _MainPageState extends State<MainPage> {
   }
 
   void _onScroll(double delta) {
-    if (_scrollLocked) return;
+    if (_scrollLocked || !_introDone) return;
     if (delta > 0 && _currentPage < 1) {
       _goToPage(1);
     } else if (delta < 0 && _currentPage > 0) {
@@ -51,125 +220,186 @@ class _MainPageState extends State<MainPage> {
 
     return Scaffold(
       backgroundColor: AppColors.abyss,
-      body: Listener(
-        onPointerSignal: (event) {
-          if (event is PointerScrollEvent) {
-            _onScroll(event.scrollDelta.dy);
-          }
-        },
-        child: PageView(
-          controller: _pageController,
-          scrollDirection: Axis.vertical,
-          physics: const NeverScrollableScrollPhysics(),
-          children: [
-            // Page 0: Hero intro
-            _buildHeroPage(context, isMobile),
-            // Page 1: Navigation cards + footer
-            _buildCardsPage(context, isMobile),
-          ],
-        ),
+      body: Stack(
+        children: [
+          // Main content (always mounted)
+          Listener(
+            onPointerSignal: (event) {
+              if (event is PointerScrollEvent) {
+                _onScroll(event.scrollDelta.dy);
+              }
+            },
+            child: PageView(
+              controller: _pageController,
+              scrollDirection: Axis.vertical,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _buildHeroPage(context, isMobile),
+                _buildCardsPage(context, isMobile),
+              ],
+            ),
+          ),
+
+          // Video overlay (intro)
+          if (_showIntro && _videoPlaying)
+            AnimatedOpacity(
+              opacity: _videoFadingOut ? 0.0 : 1.0,
+              duration: const Duration(milliseconds: 800),
+              child: const SizedBox.expand(
+                child: HtmlElementView(viewType: _videoViewType),
+              ),
+            ),
+
+          // Black overlay during hero stagger (covers until animation starts)
+          if (_showIntro && _heroAnimating && !_introDone)
+            const SizedBox.expand(
+              child: ColoredBox(color: AppColors.abyss),
+            ),
+        ],
       ),
     );
   }
 
   Widget _buildHeroPage(BuildContext context, bool isMobile) {
+    // If intro hasn't played or is done, show static
+    final bool animate = _showIntro && !_introDone;
+
     return Center(
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Green radial glow
-          Container(
-            width: 600,
-            height: 600,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  AppColors.signalGreen.withValues(alpha: 0.12),
-                  AppColors.emerald.withValues(alpha: 0.04),
-                  Colors.transparent,
-                ],
-                stops: const [0, 0.4, 0.7],
-              ),
-            ),
-          ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
+      child: AnimatedBuilder(
+        animation: _heroStaggerController,
+        builder: (context, _) {
+          return Stack(
+            alignment: Alignment.center,
             children: [
-              // Logo
-              Image.asset(
-                'assets/Blanche_Logo.png',
-                width: 48,
-                height: 48,
+              // Green radial glow
+              SlideTransition(
+                position: animate ? _glowSlide : _alwaysZero,
+                child: Opacity(
+                  opacity: animate ? _glowFade.value : 1.0,
+                  child: Container(
+                    width: 600,
+                    height: 600,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          AppColors.signalGreen.withValues(alpha: 0.12),
+                          AppColors.emerald.withValues(alpha: 0.04),
+                          Colors.transparent,
+                        ],
+                        stops: const [0, 0.4, 0.7],
+                      ),
+                    ),
+                  ),
+                ),
               ),
-              const SizedBox(height: 24),
-              Text.rich(
-                TextSpan(
-                  children: [
-                    const TextSpan(text: "Hi, I'm "),
-                    TextSpan(
-                      text: 'Blanche',
-                      style: TextStyle(
-                        color: AppColors.signalGreen,
-                        shadows: [
-                          Shadow(
-                            color: AppColors.signalGreen
-                                .withValues(alpha: 0.3),
-                            blurRadius: 40,
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Logo
+                  SlideTransition(
+                    position: animate ? _logoSlide : _alwaysZero,
+                    child: Opacity(
+                      opacity: animate ? _logoFade.value : 1.0,
+                      child: Image.asset(
+                        'assets/Blanche_Logo.png',
+                        width: 48,
+                        height: 48,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  // Title
+                  SlideTransition(
+                    position: animate ? _titleSlide : _alwaysZero,
+                    child: Opacity(
+                      opacity: animate ? _titleFade.value : 1.0,
+                      child: Text.rich(
+                        TextSpan(
+                          children: [
+                            const TextSpan(text: "Hi, I'm "),
+                            TextSpan(
+                              text: 'Blanche',
+                              style: TextStyle(
+                                color: AppColors.signalGreen,
+                                shadows: [
+                                  Shadow(
+                                    color: AppColors.signalGreen
+                                        .withValues(alpha: 0.3),
+                                    blurRadius: 40,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        style: Theme.of(context)
+                            .textTheme
+                            .displayLarge
+                            ?.copyWith(fontSize: isMobile ? 36 : 60),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Subtitle + Scroll
+                  SlideTransition(
+                    position: animate ? _subtitleSlide : _alwaysZero,
+                    child: Opacity(
+                      opacity: animate ? _subtitleFade.value : 1.0,
+                      child: Column(
+                        children: [
+                          Text(
+                            'Developer & Creator',
+                            style:
+                                Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                      fontSize: isMobile ? 16 : 18,
+                                    ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 48),
+                          AnimatedOpacity(
+                            opacity: _currentPage == 0 && _introDone ? 1.0 : 0.0,
+                            duration: const Duration(milliseconds: 300),
+                            child: GestureDetector(
+                              onTap: () => _goToPage(1),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    'Scroll',
+                                    style: TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 12,
+                                      color: AppColors.steel,
+                                      letterSpacing: 2,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Icon(
+                                    Icons.keyboard_arrow_down,
+                                    color: AppColors.steel,
+                                    size: 20,
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ],
                       ),
                     ),
-                  ],
-                ),
-                style: Theme.of(context)
-                    .textTheme
-                    .displayLarge
-                    ?.copyWith(fontSize: isMobile ? 36 : 60),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Developer & Creator',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      fontSize: isMobile ? 16 : 18,
-                    ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 48),
-              // Scroll hint
-              AnimatedOpacity(
-                opacity: _currentPage == 0 ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 300),
-                child: GestureDetector(
-                  onTap: () => _goToPage(1),
-                  child: Column(
-                    children: [
-                      Text(
-                        'Scroll',
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 12,
-                          color: AppColors.steel,
-                          letterSpacing: 2,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Icon(
-                        Icons.keyboard_arrow_down,
-                        color: AppColors.steel,
-                        size: 20,
-                      ),
-                    ],
                   ),
-                ),
+                ],
               ),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
+
+  static final _alwaysZero = ConstantTween(Offset.zero).animate(
+    kAlwaysCompleteAnimation,
+  );
 
   Widget _buildCardsPage(BuildContext context, bool isMobile) {
     return Column(
@@ -198,7 +428,6 @@ class _MainPageState extends State<MainPage> {
             ),
           ),
         ),
-        // Footer
         Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 32),
