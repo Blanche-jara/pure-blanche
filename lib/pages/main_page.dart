@@ -1,8 +1,48 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
-class MainPage extends StatelessWidget {
+class MainPage extends StatefulWidget {
   const MainPage({super.key});
+
+  @override
+  State<MainPage> createState() => _MainPageState();
+}
+
+class _MainPageState extends State<MainPage> {
+  final PageController _pageController = PageController();
+  bool _scrollLocked = false;
+  int _currentPage = 0;
+  static const _scrollCooldown = Duration(milliseconds: 800);
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _goToPage(int index) {
+    if (index < 0 || index > 1) return;
+    _scrollLocked = true;
+    setState(() => _currentPage = index);
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeInOut,
+    );
+    Future.delayed(_scrollCooldown, () {
+      if (mounted) _scrollLocked = false;
+    });
+  }
+
+  void _onScroll(double delta) {
+    if (_scrollLocked) return;
+    if (delta > 0 && _currentPage < 1) {
+      _goToPage(1);
+    } else if (delta < 0 && _currentPage > 0) {
+      _goToPage(0);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -11,129 +51,171 @@ class MainPage extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.abyss,
-      body: SingleChildScrollView(
-        child: Column(
+      body: Listener(
+        onPointerSignal: (event) {
+          if (event is PointerScrollEvent) {
+            _onScroll(event.scrollDelta.dy);
+          }
+        },
+        child: PageView(
+          controller: _pageController,
+          scrollDirection: Axis.vertical,
+          physics: const NeverScrollableScrollPhysics(),
           children: [
-            // Hero area
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.symmetric(
-                horizontal: isMobile ? 20 : 40,
-                vertical: isMobile ? 80 : 140,
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Green radial glow
-                  Center(
-                    child: Container(
-                      width: 600,
-                      height: 600,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            AppColors.signalGreen.withValues(alpha: 0.12),
-                            AppColors.emerald.withValues(alpha: 0.04),
-                            Colors.transparent,
-                          ],
-                          stops: const [0, 0.4, 0.7],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Column(
-                    children: [
-                      // Logo
-                      Image.asset(
-                        'assets/Blanche_Logo.png',
-                        width: 48,
-                        height: 48,
-                      ),
-                      const SizedBox(height: 24),
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            const TextSpan(text: "Hi, I'm "),
-                            TextSpan(
-                              text: 'Blanche',
-                              style: TextStyle(
-                                color: AppColors.signalGreen,
-                                shadows: [
-                                  Shadow(
-                                    color: AppColors.signalGreen
-                                        .withValues(alpha: 0.3),
-                                    blurRadius: 40,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        style: Theme.of(context)
-                            .textTheme
-                            .displayLarge
-                            ?.copyWith(fontSize: isMobile ? 36 : 60),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Developer & Creator',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              fontSize: isMobile ? 16 : 18,
-                            ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // 3 Navigation Cards
-            Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: isMobile ? 16 : 40,
-              ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
-                  child: isMobile
-                      ? Column(
-                          children: _buildCards(context, double.infinity),
-                        )
-                      : Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: _buildCards(context, null),
-                        ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 120),
-
-            // Footer
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 32),
-              decoration: const BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: AppColors.warmCharcoal),
-                ),
-              ),
-              child: const Text(
-                '© 2026 Blanche. All rights reserved.',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 13,
-                  color: AppColors.steel,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
+            // Page 0: Hero intro
+            _buildHeroPage(context, isMobile),
+            // Page 1: Navigation cards + footer
+            _buildCardsPage(context, isMobile),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildHeroPage(BuildContext context, bool isMobile) {
+    return Center(
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Green radial glow
+          Container(
+            width: 600,
+            height: 600,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  AppColors.signalGreen.withValues(alpha: 0.12),
+                  AppColors.emerald.withValues(alpha: 0.04),
+                  Colors.transparent,
+                ],
+                stops: const [0, 0.4, 0.7],
+              ),
+            ),
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Logo
+              Image.asset(
+                'assets/Blanche_Logo.png',
+                width: 48,
+                height: 48,
+              ),
+              const SizedBox(height: 24),
+              Text.rich(
+                TextSpan(
+                  children: [
+                    const TextSpan(text: "Hi, I'm "),
+                    TextSpan(
+                      text: 'Blanche',
+                      style: TextStyle(
+                        color: AppColors.signalGreen,
+                        shadows: [
+                          Shadow(
+                            color: AppColors.signalGreen
+                                .withValues(alpha: 0.3),
+                            blurRadius: 40,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                style: Theme.of(context)
+                    .textTheme
+                    .displayLarge
+                    ?.copyWith(fontSize: isMobile ? 36 : 60),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Developer & Creator',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontSize: isMobile ? 16 : 18,
+                    ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 48),
+              // Scroll hint
+              AnimatedOpacity(
+                opacity: _currentPage == 0 ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 300),
+                child: GestureDetector(
+                  onTap: () => _goToPage(1),
+                  child: Column(
+                    children: [
+                      Text(
+                        'Scroll',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          color: AppColors.steel,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Icon(
+                        Icons.keyboard_arrow_down,
+                        color: AppColors.steel,
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCardsPage(BuildContext context, bool isMobile) {
+    return Column(
+      children: [
+        Expanded(
+          child: Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 16 : 40,
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: isMobile
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: _buildCards(context, double.infinity),
+                      )
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: _buildCards(context, null),
+                      ),
+              ),
+            ),
+          ),
+        ),
+        // Footer
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 32),
+          decoration: const BoxDecoration(
+            border: Border(
+              top: BorderSide(color: AppColors.warmCharcoal),
+            ),
+          ),
+          child: const Text(
+            '© 2026 Blanche. All rights reserved.',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 13,
+              color: AppColors.steel,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ],
     );
   }
 
@@ -171,13 +253,11 @@ class MainPage extends StatelessWidget {
       );
 
       if (fixedWidth != null) {
-        // Mobile: full width, vertical gap
         return Padding(
           padding: EdgeInsets.only(bottom: i < cards.length - 1 ? 16 : 0),
           child: card,
         );
       } else {
-        // Desktop: flex row with gap
         return Expanded(
           child: Padding(
             padding: EdgeInsets.only(
