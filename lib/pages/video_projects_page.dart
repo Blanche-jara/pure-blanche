@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import '../widgets/youtube_player.dart';
 
 // ---------------------------------------------------------------------------
 // Data
@@ -8,9 +9,19 @@ import '../theme/app_colors.dart';
 
 class _VideoClip {
   final String title;
-  final String? url; // 나중에 영상 링크
+  final String? youtubeId; // YouTube video ID
 
-  const _VideoClip({required this.title, this.url});
+  const _VideoClip({required this.title, this.youtubeId});
+
+  bool get hasVideo => youtubeId != null && youtubeId!.isNotEmpty;
+
+  /// YouTube auto-generated thumbnail (mqdefault = 320x180, middle frame)
+  String get thumbnailUrl =>
+      'https://img.youtube.com/vi/$youtubeId/mqdefault.jpg';
+
+  /// High-quality thumbnail
+  String get thumbnailHqUrl =>
+      'https://img.youtube.com/vi/$youtubeId/hqdefault.jpg';
 }
 
 class _Era {
@@ -57,7 +68,7 @@ const _eras = [
     description: '청년 작가로 활동. 독립 영상, 실험 영화, 아트 필름 등 개인 창작 중심.',
     hero: _VideoClip(title: '메인 영상'),
     subs: [
-      _VideoClip(title: '서브 영상 1'),
+      _VideoClip(title: '서브 영상 1', youtubeId: 'L1vaet56r2U'),
       _VideoClip(title: '서브 영상 2'),
       _VideoClip(title: '서브 영상 3'),
       _VideoClip(title: '서브 영상 4'),
@@ -725,10 +736,27 @@ class _HeroVideoState extends State<_HeroVideo> {
 
   @override
   Widget build(BuildContext context) {
+    // If youtubeId exists, show embedded player
+    if (widget.clip.hasVideo) {
+      return Container(
+        width: double.infinity,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: AppColors.carbon,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.warmCharcoal),
+        ),
+        child: YoutubePlayer(
+          youtubeId: widget.clip.youtubeId!,
+          autoplay: true,
+        ),
+      );
+    }
+
+    // Placeholder when no video
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.click,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         width: double.infinity,
@@ -739,19 +767,10 @@ class _HeroVideoState extends State<_HeroVideo> {
             color: _hovered ? AppColors.signalGreen : AppColors.warmCharcoal,
             width: _hovered ? 2 : 1,
           ),
-          boxShadow: _hovered
-              ? [
-                  BoxShadow(
-                    color: AppColors.signalGreen.withValues(alpha: 0.1),
-                    blurRadius: 30,
-                  ),
-                ]
-              : null,
         ),
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // Dark background
             Positioned.fill(
               child: Container(
                 decoration: BoxDecoration(
@@ -760,27 +779,24 @@ class _HeroVideoState extends State<_HeroVideo> {
                 ),
               ),
             ),
-            // Play icon
-            AnimatedScale(
-              scale: _hovered ? 1.1 : 1.0,
-              duration: const Duration(milliseconds: 200),
-              child: Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.carbon.withValues(alpha: 0.8),
-                  border: Border.all(
-                    color: _hovered ? AppColors.signalGreen : AppColors.warmCharcoal,
-                    width: 2,
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.videocam_off_outlined,
+                  size: 48,
+                  color: _hovered ? AppColors.signalGreen : AppColors.warmCharcoal,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Google Drive ID를 추가하세요',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    color: AppColors.steel,
                   ),
                 ),
-                child: Icon(
-                  Icons.play_arrow_rounded,
-                  size: 36,
-                  color: _hovered ? AppColors.signalGreen : AppColors.snow,
-                ),
-              ),
+              ],
             ),
             // Title overlay
             Positioned(
@@ -801,38 +817,6 @@ class _HeroVideoState extends State<_HeroVideo> {
                     fontWeight: FontWeight.w500,
                     color: AppColors.snow,
                   ),
-                ),
-              ),
-            ),
-            // "Auto-play" hint
-            Positioned(
-              right: 16,
-              top: 16,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppColors.signalGreen.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(9999),
-                  border: Border.all(
-                    color: AppColors.signalGreen.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.auto_awesome, size: 12, color: AppColors.signalGreen),
-                    SizedBox(width: 4),
-                    Text(
-                      'AUTO',
-                      style: TextStyle(
-                        fontFamily: 'Consolas',
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.signalGreen,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ],
                 ),
               ),
             ),
@@ -887,19 +871,43 @@ class _SubVideoCardState extends State<_SubVideoCard> {
             children: [
               // Thumbnail
               Expanded(
-                child: Container(
-                  width: double.infinity,
-                  decoration: const BoxDecoration(
-                    color: AppColors.abyss,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(5)),
-                  ),
-                  child: Center(
-                    child: Icon(
-                      Icons.play_circle_outline,
-                      size: 28,
-                      color: _hovered ? AppColors.signalGreen : AppColors.warmCharcoal,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.abyss,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(5)),
+                        image: widget.clip.hasVideo
+                            ? DecorationImage(
+                                image: NetworkImage(
+                                  widget.clip.thumbnailUrl,
+                                ),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
+                      ),
                     ),
-                  ),
+                    // Play overlay
+                    Center(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _hovered
+                              ? AppColors.carbon.withValues(alpha: 0.85)
+                              : AppColors.carbon.withValues(alpha: 0.6),
+                        ),
+                        child: Icon(
+                          Icons.play_arrow_rounded,
+                          size: 20,
+                          color: _hovered ? AppColors.signalGreen : AppColors.snow,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               // Title
@@ -984,27 +992,34 @@ class _VideoPopup extends StatelessWidget {
               ),
               // Player area
               Expanded(
-                child: Container(
-                  width: double.infinity,
-                  color: AppColors.abyss,
-                  child: const Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.videocam_off_outlined, size: 48, color: AppColors.warmCharcoal),
-                        SizedBox(height: 12),
-                        Text(
-                          '영상 URL을 추가하면 여기서 재생됩니다',
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 14,
-                            color: AppColors.steel,
+                child: clip.hasVideo
+                    ? ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                            bottom: Radius.circular(7)),
+                        child: YoutubePlayer(youtubeId: clip.youtubeId!),
+                      )
+                    : Container(
+                        width: double.infinity,
+                        color: AppColors.abyss,
+                        child: const Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.videocam_off_outlined,
+                                  size: 48, color: AppColors.warmCharcoal),
+                              SizedBox(height: 12),
+                              Text(
+                                'Google Drive ID를 추가하세요',
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 14,
+                                  color: AppColors.steel,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
+                      ),
               ),
             ],
           ),
