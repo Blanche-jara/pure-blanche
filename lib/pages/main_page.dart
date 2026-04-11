@@ -176,22 +176,24 @@ class _MainPageState extends State<MainPage> {
       children: [
         Expanded(
           child: Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: isMobile ? 16 : 40,
-              ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1200),
-                child: isMobile
-                    ? Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: _buildCards(context, double.infinity),
-                      )
-                    : Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: _buildCards(context, null),
-                      ),
+            child: SingleChildScrollView(
+              physics: const NeverScrollableScrollPhysics(),
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 16 : 40,
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: isMobile
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: _buildCards(context, double.infinity),
+                        )
+                      : Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: _buildCards(context, null),
+                        ),
+                ),
               ),
             ),
           ),
