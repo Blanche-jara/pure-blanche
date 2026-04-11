@@ -44,19 +44,11 @@ class MainPage extends StatelessWidget {
                   ),
                   Column(
                     children: [
-                      // Bolt icon
-                      Text(
-                        '⚡',
-                        style: TextStyle(
-                          fontSize: 48,
-                          shadows: [
-                            Shadow(
-                              color: AppColors.signalGreen
-                                  .withValues(alpha: 0.8),
-                              blurRadius: 12,
-                            ),
-                          ],
-                        ),
+                      // Logo
+                      Image.asset(
+                        'assets/Blanche_Logo.png',
+                        width: 48,
+                        height: 48,
                       ),
                       const SizedBox(height: 24),
                       Text.rich(

@@ -6,7 +6,11 @@
       "Bash(export PATH=\"/c/Users/Blanche/Desktop/Code/flutter/bin:$PATH\")",
       "Bash(powershell -Command \"[Environment]::GetEnvironmentVariable\\('Path', 'User'\\)\")",
       "Bash(powershell -Command \"[Environment]::SetEnvironmentVariable\\('Path', [Environment]::GetEnvironmentVariable\\('Path', 'User'\\) + ';C:\\\\Users\\\\Blanche\\\\Desktop\\\\Code\\\\flutter\\\\bin', 'User'\\)\")",
-      "Bash(flutter pub:*)"
+      "Bash(flutter pub:*)",
+      "Bash(mkdir -p /c/Users/Blanche/Desktop/Code/pure-blanche/assets)",
+      "Bash(cp /c/Users/Blanche/Desktop/Code/pure-blanche/design/Blanche_Logo.png /c/Users/Blanche/Desktop/Code/pure-blanche/assets/)",
+      "Bash(xxd /c/Users/Blanche/Desktop/Code/pure-blanche/assets/Blanche_Logo.png)",
+      "Bash(flutter clean:*)"
     ]
   }
 }
