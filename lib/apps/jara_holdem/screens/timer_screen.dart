@@ -1,14 +1,15 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'package:web/web.dart' as web;
 import '../providers/tournament_provider.dart';
 import '../widgets/countdown_display.dart';
 import '../widgets/blind_info_display.dart';
 import '../widgets/control_buttons.dart';
 import 'help_screen.dart';
 import 'setup_screen.dart';
+import '../services/fullscreen_service.dart';
 
 class TimerScreen extends StatefulWidget {
   const TimerScreen({super.key});
@@ -116,16 +117,17 @@ class _TimerScreenState extends State<TimerScreen> {
             ),
             tooltip: 'Holdem Guide',
           ),
-          // Fullscreen toggle
-          IconButton(
-            icon: Icon(
-              _isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
-              color: Colors.white54,
-              size: 28,
+          // Fullscreen toggle (web only)
+          if (kIsWeb)
+            IconButton(
+              icon: Icon(
+                _isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                color: Colors.white54,
+                size: 28,
+              ),
+              onPressed: _toggleFullscreen,
+              tooltip: 'Fullscreen',
             ),
-            onPressed: _toggleFullscreen,
-            tooltip: 'Fullscreen',
-          ),
         ],
       ),
     );
@@ -133,9 +135,9 @@ class _TimerScreenState extends State<TimerScreen> {
 
   void _toggleFullscreen() {
     if (_isFullscreen) {
-      web.document.exitFullscreen();
+      FullscreenService.exitFullscreen();
     } else {
-      web.document.documentElement?.requestFullscreen();
+      FullscreenService.enterFullscreen();
     }
     setState(() {
       _isFullscreen = !_isFullscreen;

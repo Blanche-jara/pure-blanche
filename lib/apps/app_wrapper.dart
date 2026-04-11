@@ -10,13 +10,19 @@ class AppWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final isCompact = size.width > size.height && size.height < 500;
+
     return Scaffold(
       backgroundColor: AppColors.abyss,
       body: Column(
         children: [
           // Top bar
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: EdgeInsets.symmetric(
+              horizontal: isCompact ? 12 : 16,
+              vertical: isCompact ? 6 : 12,
+            ),
             decoration: BoxDecoration(
               color: AppColors.abyss.withValues(alpha: 0.92),
               border: const Border(
@@ -29,9 +35,9 @@ class AppWrapper extends StatelessWidget {
                 const SizedBox(width: 16),
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Segoe UI',
-                    fontSize: 18,
+                    fontSize: isCompact ? 14 : 18,
                     fontWeight: FontWeight.w600,
                     letterSpacing: -0.3,
                     color: AppColors.snow,

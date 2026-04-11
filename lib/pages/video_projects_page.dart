@@ -912,7 +912,7 @@ class _SubVideoStripState extends State<_SubVideoStrip> {
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 36),
           itemCount: widget.subs.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 12),
+          separatorBuilder: (_, _) => const SizedBox(width: 12),
           itemBuilder: (context, i) => _SubVideoCard(
             clip: widget.subs[i],
             width: cardWidth,

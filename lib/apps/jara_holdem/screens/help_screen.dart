@@ -57,17 +57,21 @@ class HelpScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final isLandscape = size.width > size.height;
+
     return DefaultTabController(
       length: 8,
       child: Scaffold(
         backgroundColor: const Color(0xFF0A0A0A),
         appBar: AppBar(
           backgroundColor: const Color(0xFF1A1A1A),
+          toolbarHeight: isLandscape ? 40 : kToolbarHeight,
           title: Text(
             'HOLDEM GUIDE',
             style: GoogleFonts.orbitron(
               color: Colors.amber.shade300,
-              fontSize: 18,
+              fontSize: isLandscape ? 14 : 18,
               fontWeight: FontWeight.w700,
               letterSpacing: 2,
             ),
@@ -218,10 +222,14 @@ class HelpScreen extends StatelessWidget {
   // ===== HANDS =====
   Widget _buildHandsPage(BuildContext context) {
     final sw = MediaQuery.of(context).size.width;
-    final termFs = (sw * 0.022).clamp(14.0, 28.0);
-    final descFs = (sw * 0.014).clamp(11.0, 17.0);
-    final cardW = (sw * 0.03).clamp(24.0, 40.0);
+    final sh = MediaQuery.of(context).size.height;
+    final isLandscape = sw > sh;
+    final cols = isLandscape ? 3 : 2;
+    final termFs = (sw * 0.018).clamp(11.0, 22.0);
+    final descFs = (sw * 0.012).clamp(9.0, 15.0);
+    final cardW = (sw * 0.022).clamp(18.0, 34.0);
     final cardH = cardW * 1.42;
+    final aspectRatio = isLandscape ? 2.8 : 2.2;
 
     final hands = [
       ['Pocket Pair', '같은 숫자 2장', 'A', '♠', 'A', '♥'],
@@ -233,24 +241,24 @@ class HelpScreen extends StatelessWidget {
     ];
 
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isLandscape ? 10 : 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _subtitle('핸드 타입'),
           Expanded(
             child: GridView.builder(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 12,
-                childAspectRatio: 2.2,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: cols,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: isLandscape ? 8 : 12,
+                childAspectRatio: aspectRatio,
               ),
               itemCount: hands.length,
               itemBuilder: (context, i) {
                 final h = hands[i];
                 return Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: EdgeInsets.all(isLandscape ? 8 : 12),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1A1A1A),
                     borderRadius: BorderRadius.circular(10),
@@ -264,12 +272,12 @@ class HelpScreen extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(h[0], style: GoogleFonts.orbitron(color: Colors.red.shade500, fontSize: termFs, fontWeight: FontWeight.w800, height: 1.2)),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 2),
                             Flexible(child: Text(h[1], style: TextStyle(color: Colors.white60, fontSize: descFs), overflow: TextOverflow.ellipsis, maxLines: 2)),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       _CardRow([[h[2], h[3]], [h[4], h[5]]], cardWidth: cardW, cardHeight: cardH),
                     ],
                   ),
@@ -618,37 +626,42 @@ class HelpScreen extends StatelessWidget {
   // ===== RANKINGS =====
   Widget _buildRankingsPage(BuildContext context) {
     final sw = MediaQuery.of(context).size.width;
-    final termFs = (sw * 0.018).clamp(12.0, 24.0);
-    final descFs = (sw * 0.012).clamp(10.0, 16.0);
-    final cardW = (sw * 0.025).clamp(20.0, 36.0);
+    final sh = MediaQuery.of(context).size.height;
+    final isLandscape = sw > sh;
+    final cols = isLandscape ? 5 : 2;
+    final termFs = (sw * 0.014).clamp(10.0, 18.0);
+    final descFs = (sw * 0.010).clamp(8.0, 14.0);
+    final cardW = (sw * 0.018).clamp(14.0, 28.0);
     final cardH = cardW * 1.42;
+    final aspectRatio = isLandscape ? 0.85 : 1.8;
 
     final ranks = [
       ['High Card', '아무 조합도 없음', 'A', '♠', '8', '♥', '5', '♦', '3', '♣', '2', '♠'],
       ['One Pair', '같은 숫자 2장', 'K', '♠', 'K', '♥', '9', '♦', '5', '♣', '2', '♠'],
-      ['Two Pair', '같은 숫자 2장 × 2세트', 'Q', '♠', 'Q', '♥', '7', '♦', '7', '♣', '3', '♠'],
-      ['Three of a Kind', '같은 숫자 3장 (트립스/셋)', 'J', '♠', 'J', '♥', 'J', '♦', '8', '♣', '2', '♠'],
-      ['Straight', '연속된 숫자 5장', '5', '♠', '6', '♥', '7', '♦', '8', '♣', '9', '♠'],
+      ['Two Pair', '2장 × 2세트', 'Q', '♠', 'Q', '♥', '7', '♦', '7', '♣', '3', '♠'],
+      ['Three of a Kind', '같은 숫자 3장', 'J', '♠', 'J', '♥', 'J', '♦', '8', '♣', '2', '♠'],
+      ['Straight', '연속 숫자 5장', '5', '♠', '6', '♥', '7', '♦', '8', '♣', '9', '♠'],
       ['Flush', '같은 무늬 5장', 'A', '♥', 'T', '♥', '8', '♥', '5', '♥', '2', '♥'],
-      ['Full House', '3장 + 2장 조합', 'A', '♠', 'A', '♥', 'A', '♦', 'K', '♣', 'K', '♠'],
-      ['Four of a Kind', '같은 숫자 4장 (쿼드)', '9', '♠', '9', '♥', '9', '♦', '9', '♣', 'A', '♠'],
-      ['Straight Flush', '같은 무늬 + 연속 숫자', '5', '♥', '6', '♥', '7', '♥', '8', '♥', '9', '♥'],
+      ['Full House', '3장 + 2장', 'A', '♠', 'A', '♥', 'A', '♦', 'K', '♣', 'K', '♠'],
+      ['Four of a Kind', '같은 숫자 4장', '9', '♠', '9', '♥', '9', '♦', '9', '♣', 'A', '♠'],
+      ['Straight Flush', '무늬+연속 숫자', '5', '♥', '6', '♥', '7', '♥', '8', '♥', '9', '♥'],
       ['Royal Flush', 'T-J-Q-K-A 같은 무늬', 'T', '♠', 'J', '♠', 'Q', '♠', 'K', '♠', 'A', '♠'],
     ];
 
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isLandscape ? 10 : 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _subtitle('족보 (약 → 강)'),
           Expanded(
             child: GridView.builder(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 10,
-                childAspectRatio: 1.8,
+              physics: isLandscape ? const NeverScrollableScrollPhysics() : null,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: cols,
+                crossAxisSpacing: isLandscape ? 8 : 16,
+                mainAxisSpacing: isLandscape ? 6 : 10,
+                childAspectRatio: aspectRatio,
               ),
               itemCount: ranks.length,
               itemBuilder: (context, i) {
@@ -658,10 +671,10 @@ class HelpScreen extends StatelessWidget {
                   cards.add([r[j], r[j + 1]]);
                 }
                 return Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: EdgeInsets.all(isLandscape ? 6 : 10),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1A1A1A),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.white10),
                   ),
                   child: Column(
@@ -679,10 +692,10 @@ class HelpScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 1),
                       Text(r[1], style: TextStyle(color: Colors.white54, fontSize: descFs), overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 6),
-                      Flexible(child: _CardRow(cards, cardWidth: cardW, cardHeight: cardH)),
+                      const SizedBox(height: 4),
+                      Flexible(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: _CardRow(cards, cardWidth: cardW, cardHeight: cardH))),
                     ],
                   ),
                 );

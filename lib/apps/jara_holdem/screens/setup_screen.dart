@@ -37,113 +37,168 @@ class _SetupScreenState extends State<SetupScreen> {
     super.dispose();
   }
 
+  Widget _buildNameField() {
+    return TextField(
+      controller: _nameController,
+      style: const TextStyle(color: Colors.white, fontSize: 18),
+      decoration: const InputDecoration(
+        labelText: 'Tournament Name',
+        labelStyle: TextStyle(color: Colors.white54),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: Colors.white24),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: Colors.green),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomButtons() {
+    return Container(
+      color: const Color(0xFF1E1E1E),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () => Navigator.pop(context),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white54,
+                side: const BorderSide(color: Colors.white24),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: const Text('Cancel'),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            flex: 2,
+            child: ElevatedButton(
+              onPressed: _save,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green.shade700,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: const Text('Save & Start', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLevelContent() {
+    if (_isCashGame) return _buildCashGameEditor();
+    if (_levels.isEmpty) return _buildImportView();
+    return Expanded(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 80),
+        child: LevelListEditor(
+          levels: _levels,
+          onChanged: (newLevels) {
+            setState(() {
+              _levels = newLevels;
+            });
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final isLandscape = size.width > size.height && size.width > 600;
+
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1E1E1E),
         title: const Text('Tournament Setup', style: TextStyle(color: Colors.white)),
         iconTheme: const IconThemeData(color: Colors.white),
+        toolbarHeight: isLandscape ? 44 : kToolbarHeight,
       ),
-      body: Column(
-        children: [
-          // Preset selector
-          _buildPresetSelector(),
-          const Divider(color: Colors.white12, height: 1),
-          // Tournament name
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _nameController,
-              style: const TextStyle(color: Colors.white, fontSize: 18),
-              decoration: const InputDecoration(
-                labelText: 'Tournament Name',
-                labelStyle: TextStyle(color: Colors.white54),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.white24),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.green),
-                ),
+      body: isLandscape ? _buildLandscapeBody() : _buildPortraitBody(),
+      bottomNavigationBar: _buildBottomButtons(),
+    );
+  }
+
+  Widget _buildPortraitBody() {
+    return Column(
+      children: [
+        _buildPresetSelector(),
+        const Divider(color: Colors.white12, height: 1),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: _buildNameField(),
+        ),
+        _buildLevelContent(),
+      ],
+    );
+  }
+
+  Widget _buildLandscapeBody() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Left pane: settings
+        SizedBox(
+          width: 320,
+          child: Column(
+            children: [
+              _buildPresetSelector(),
+              const Divider(color: Colors.white12, height: 1),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: _buildNameField(),
+              ),
+              if (_isCashGame) _buildCashGameEditor(),
+              if (!_isCashGame && _levels.isEmpty) _buildImportView(),
+            ],
+          ),
+        ),
+        // Vertical divider
+        const VerticalDivider(color: Colors.white12, width: 1),
+        // Right pane: level list
+        if (!_isCashGame && _levels.isNotEmpty)
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: LevelListEditor(
+                levels: _levels,
+                onChanged: (newLevels) {
+                  setState(() {
+                    _levels = newLevels;
+                  });
+                },
               ),
             ),
           ),
-          // Cash game: SB/BB editor only
-          if (_isCashGame) _buildCashGameEditor(),
-          // Empty slate with import option
-          if (!_isCashGame && _levels.isEmpty) _buildImportView(),
-          // Tournament: full level editor
-          if (!_isCashGame && _levels.isNotEmpty)
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.only(bottom: 80),
-                child: LevelListEditor(
-                  levels: _levels,
-                  onChanged: (newLevels) {
-                    setState(() {
-                      _levels = newLevels;
-                    });
-                  },
-                ),
-              ),
-            ),
-        ],
-      ),
-      bottomNavigationBar: Container(
-        color: const Color(0xFF1E1E1E),
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () => Navigator.pop(context),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white54,
-                  side: const BorderSide(color: Colors.white24),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: const Text('Cancel'),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              flex: 2,
-              child: ElevatedButton(
-                onPressed: _save,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade700,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: const Text('Save & Start', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ],
-        ),
-      ),
+      ],
     );
   }
 
   Widget _buildPresetSelector() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
+      child: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 8,
+        runSpacing: 8,
         children: [
           const Text('Preset:', style: TextStyle(color: Colors.white54, fontSize: 14)),
-          const SizedBox(width: 12),
           _PresetChip(
             label: 'Classic Tournament',
             selected: !_isCashGame && _nameController.text == classicTournament.name,
             onTap: () => _applyPreset(classicTournament),
           ),
-          const SizedBox(width: 8),
           _PresetChip(
             label: 'Classic Cash',
             selected: _isCashGame,
             onTap: () => _applyPreset(classicCash),
           ),
-          const SizedBox(width: 8),
           _PresetChip(
             label: 'Empty Slate',
             selected: !_isCashGame && _levels.isEmpty,
@@ -332,8 +387,10 @@ class _SetupScreenState extends State<SetupScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 12,
+              runSpacing: 8,
               children: [
                 ElevatedButton.icon(
                   onPressed: _showAutoGenerateDialog,
@@ -344,7 +401,6 @@ class _SetupScreenState extends State<SetupScreen> {
                     foregroundColor: Colors.white,
                   ),
                 ),
-                const SizedBox(width: 12),
                 ElevatedButton.icon(
                   onPressed: () {
                     setState(() {
