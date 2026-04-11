@@ -705,7 +705,7 @@ class _EraPage extends StatelessWidget {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: era.subs.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                separatorBuilder: (_, _) => const SizedBox(width: 12),
                 itemBuilder: (context, i) => _SubVideoCard(
                   clip: era.subs[i],
                   width: isMobile ? 150 : 180,

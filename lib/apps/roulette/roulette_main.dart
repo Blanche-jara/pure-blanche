@@ -161,11 +161,11 @@ class _HomePageState extends State<HomePage> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.white.withValues(alpha:0.9),
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withValues(alpha:0.1),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -214,7 +214,7 @@ class _HomePageState extends State<HomePage> {
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha:0.1),
                         blurRadius: 20,
                         offset: const Offset(0, -5),
                       ),
@@ -271,7 +271,7 @@ class _HomePageState extends State<HomePage> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFF6B6B).withOpacity(0.1),
+                            color: const Color(0xFFFF6B6B).withValues(alpha:0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
@@ -343,13 +343,13 @@ class _HomePageState extends State<HomePage> {
                                       decoration: BoxDecoration(
                                         gradient: LinearGradient(
                                           colors: [
-                                            _getColor(index).withOpacity(0.1),
-                                            _getColor(index).withOpacity(0.05),
+                                            _getColor(index).withValues(alpha:0.1),
+                                            _getColor(index).withValues(alpha:0.05),
                                           ],
                                         ),
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
-                                          color: _getColor(index).withOpacity(0.3),
+                                          color: _getColor(index).withValues(alpha:0.3),
                                         ),
                                       ),
                                       child: ListTile(
@@ -360,13 +360,13 @@ class _HomePageState extends State<HomePage> {
                                             gradient: LinearGradient(
                                               colors: [
                                                 _getColor(index),
-                                                _getColor(index).withOpacity(0.7),
+                                                _getColor(index).withValues(alpha:0.7),
                                               ],
                                             ),
                                             borderRadius: BorderRadius.circular(10),
                                             boxShadow: [
                                               BoxShadow(
-                                                color: _getColor(index).withOpacity(0.3),
+                                                color: _getColor(index).withValues(alpha:0.3),
                                                 blurRadius: 4,
                                                 offset: const Offset(0, 2),
                                               ),
@@ -417,7 +417,7 @@ class _HomePageState extends State<HomePage> {
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: const Color(0xFFFF6B6B).withOpacity(0.3)),
+                                    border: Border.all(color: const Color(0xFFFF6B6B).withValues(alpha:0.3)),
                                   ),
                                   child: DropdownButtonHideUnderline(
                                     child: DropdownButton<int>(
@@ -458,7 +458,7 @@ class _HomePageState extends State<HomePage> {
                               foregroundColor: Colors.white,
                               disabledBackgroundColor: Colors.grey.shade300,
                               elevation: _items.length >= 2 ? 4 : 0,
-                              shadowColor: const Color(0xFFFF6B6B).withOpacity(0.5),
+                              shadowColor: const Color(0xFFFF6B6B).withValues(alpha:0.5),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
                               ),
@@ -680,14 +680,14 @@ class _RoulettePageState extends State<RoulettePage>
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFFFF6B6B).withOpacity(0.4),
+                                color: const Color(0xFFFF6B6B).withValues(alpha:0.4),
                                 blurRadius: 12,
                                 offset: const Offset(0, 4),
                               ),
                             ],
                           ),
                           child: Text(
-                            '${_currentRound} / ${widget.pickCount} 추첨',
+                            '$_currentRound / ${widget.pickCount} 추첨',
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -708,9 +708,9 @@ class _RoulettePageState extends State<RoulettePage>
                   margin: const EdgeInsets.symmetric(horizontal: 16),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
+                    color: Colors.white.withValues(alpha:0.1),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    border: Border.all(color: Colors.white.withValues(alpha:0.2)),
                   ),
                   child: Wrap(
                     spacing: 8,
@@ -728,7 +728,7 @@ class _RoulettePageState extends State<RoulettePage>
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFFFF6B6B).withOpacity(0.3),
+                              color: const Color(0xFFFF6B6B).withValues(alpha:0.3),
                               blurRadius: 4,
                               offset: const Offset(0, 2),
                             ),
@@ -784,7 +784,7 @@ class _RoulettePageState extends State<RoulettePage>
                           borderRadius: BorderRadius.circular(8),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFFFF6B6B).withOpacity(0.5),
+                              color: const Color(0xFFFF6B6B).withValues(alpha:0.5),
                               blurRadius: 12,
                               offset: const Offset(0, 4),
                             ),
@@ -804,7 +804,7 @@ class _RoulettePageState extends State<RoulettePage>
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFFFF6B6B).withOpacity(0.3),
+                              color: const Color(0xFFFF6B6B).withValues(alpha:0.3),
                               blurRadius: 30,
                               spreadRadius: 5,
                             ),
@@ -825,7 +825,7 @@ class _RoulettePageState extends State<RoulettePage>
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.1),
+                            color: Colors.white.withValues(alpha:0.1),
                             borderRadius: BorderRadius.circular(30),
                           ),
                           child: Row(
@@ -865,7 +865,7 @@ class _RoulettePageState extends State<RoulettePage>
                                 borderRadius: BorderRadius.circular(20),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: const Color(0xFFFF6B6B).withOpacity(0.4),
+                                    color: const Color(0xFFFF6B6B).withValues(alpha:0.4),
                                     blurRadius: 12,
                                     offset: const Offset(0, 4),
                                   ),
@@ -874,7 +874,7 @@ class _RoulettePageState extends State<RoulettePage>
                               child: Column(
                                 children: [
                                   Text(
-                                    '${_currentRound}번째 당첨!',
+                                    '$_currentRound번째 당첨!',
                                     style: const TextStyle(
                                       color: Colors.white70,
                                       fontSize: 14,
@@ -903,7 +903,7 @@ class _RoulettePageState extends State<RoulettePage>
                                   borderRadius: BorderRadius.circular(30),
                                 ),
                                 elevation: 8,
-                                shadowColor: Colors.black.withOpacity(0.3),
+                                shadowColor: Colors.black.withValues(alpha:0.3),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -980,7 +980,7 @@ class RoulettePainter extends CustomPainter {
 
     // 외곽 테두리
     final outerBorderPaint = Paint()
-      ..color = Colors.white.withOpacity(0.3)
+      ..color = Colors.white.withValues(alpha:0.3)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4;
     canvas.drawCircle(center, radius, outerBorderPaint);
@@ -1000,7 +1000,7 @@ class RoulettePainter extends CustomPainter {
       );
 
       final borderPaint = Paint()
-        ..color = Colors.white.withOpacity(0.5)
+        ..color = Colors.white.withValues(alpha:0.5)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2;
 
@@ -1111,12 +1111,12 @@ class FinalResultDialog extends StatelessWidget {
           ),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: const Color(0xFFFFE66D).withOpacity(0.5),
+            color: const Color(0xFFFFE66D).withValues(alpha:0.5),
             width: 2,
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFFF6B6B).withOpacity(0.3),
+              color: const Color(0xFFFF6B6B).withValues(alpha:0.3),
               blurRadius: 30,
               spreadRadius: 5,
             ),
@@ -1135,7 +1135,7 @@ class FinalResultDialog extends StatelessWidget {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFFFF6B6B).withOpacity(0.4),
+                    color: const Color(0xFFFF6B6B).withValues(alpha:0.4),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -1163,7 +1163,7 @@ class FinalResultDialog extends StatelessWidget {
             Text(
               '총 ${selectedItems.length}명 선정',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
+                color: Colors.white.withValues(alpha:0.7),
                 fontSize: 14,
               ),
             ),
@@ -1176,13 +1176,13 @@ class FinalResultDialog extends StatelessWidget {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        const Color(0xFFFFE66D).withOpacity(0.2),
-                        const Color(0xFFFF6B6B).withOpacity(0.1),
+                        const Color(0xFFFFE66D).withValues(alpha:0.2),
+                        const Color(0xFFFF6B6B).withValues(alpha:0.1),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: const Color(0xFFFFE66D).withOpacity(0.3),
+                      color: const Color(0xFFFFE66D).withValues(alpha:0.3),
                     ),
                   ),
                   child: Row(
@@ -1236,7 +1236,7 @@ class FinalResultDialog extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   elevation: 4,
-                  shadowColor: const Color(0xFFFF6B6B).withOpacity(0.5),
+                  shadowColor: const Color(0xFFFF6B6B).withValues(alpha:0.5),
                 ),
                 child: const Text(
                   '확인',

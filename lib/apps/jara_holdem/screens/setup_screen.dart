@@ -856,7 +856,7 @@ class _AnteSection extends StatelessWidget {
               const Spacer(),
               Switch(
                 value: hasAnte,
-                activeColor: Colors.deepPurpleAccent,
+                activeThumbColor: Colors.deepPurpleAccent,
                 onChanged: onHasAnteChanged,
               ),
             ],
@@ -950,7 +950,7 @@ class _BreakSection extends StatelessWidget {
               const Spacer(),
               Switch(
                 value: insertBreaks,
-                activeColor: Colors.deepPurpleAccent,
+                activeThumbColor: Colors.deepPurpleAccent,
                 onChanged: onInsertBreaksChanged,
               ),
             ],
