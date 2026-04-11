@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter --version)",
+      "Bash(where flutter:*)",
+      "Bash(export PATH=\"/c/Users/Blanche/Desktop/Code/flutter/bin:$PATH\")",
+      "Bash(powershell -Command \"[Environment]::GetEnvironmentVariable\\('Path', 'User'\\)\")",
+      "Bash(powershell -Command \"[Environment]::SetEnvironmentVariable\\('Path', [Environment]::GetEnvironmentVariable\\('Path', 'User'\\) + ';C:\\\\Users\\\\Blanche\\\\Desktop\\\\Code\\\\flutter\\\\bin', 'User'\\)\")",
+      "Bash(flutter pub:*)"
+    ]
+  }
+}
