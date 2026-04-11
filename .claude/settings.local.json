@@ -16,7 +16,13 @@
       "Bash(curl -s 'https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=__TRACKED_VAR__&format=json')",
       "Bash(python -c ':*)",
       "Bash(python3 -c \"print\\('\\\\uc778\\\\ud130\\\\ubdf0 BLANC'\\); print\\('\\\\uc778\\\\ud130\\\\ubdf0Blanc'\\)\")",
-      "Bash(python -c \"print\\(u'\\\\uc778\\\\ud130\\\\ubdf0 BLANC'\\); print\\(u'\\\\uc778\\\\ud130\\\\ubdf0Blanc'\\)\")"
+      "Bash(python -c \"print\\(u'\\\\uc778\\\\ud130\\\\ubdf0 BLANC'\\); print\\(u'\\\\uc778\\\\ud130\\\\ubdf0Blanc'\\)\")",
+      "Bash(nslookup pure-blanche.com)",
+      "Bash(dig pure-blanche.com +short)",
+      "Bash(nslookup www.pure-blanche.com)",
+      "Bash(dig www.pure-blanche.com +short)",
+      "Bash(curl -sI https://pure-blanche.com)",
+      "Bash(curl -sI http://pure-blanche.com)"
     ]
   }
 }
