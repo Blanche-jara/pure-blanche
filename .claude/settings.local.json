@@ -23,7 +23,11 @@
       "Bash(dig www.pure-blanche.com +short)",
       "Bash(curl -sI https://pure-blanche.com)",
       "Bash(curl -sI http://pure-blanche.com)",
-      "Bash(gh run:*)"
+      "Bash(gh run:*)",
+      "Bash(git status:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(git push:*)"
     ]
   }
 }
