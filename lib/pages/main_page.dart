@@ -163,7 +163,11 @@ class _MainPageState extends State<MainPage>
                   child: PageView(
                     controller: _pageController,
                     scrollDirection: Axis.vertical,
-                    physics: const NeverScrollableScrollPhysics(),
+                    physics: isMobile
+                        ? const PageScrollPhysics()
+                        : const NeverScrollableScrollPhysics(),
+                    onPageChanged: (i) =>
+                        setState(() => _currentPage = i),
                     children: [
                       _buildHeroPage(context, isMobile),
                       _buildCardsPage(context, isMobile),

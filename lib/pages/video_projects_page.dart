@@ -450,7 +450,7 @@ class _VideoProjectsPageState extends State<VideoProjectsPage>
           child: PageView.builder(
             controller: _pageController,
             scrollDirection: Axis.vertical,
-            physics: const NeverScrollableScrollPhysics(),
+            physics: const PageScrollPhysics(),
             itemCount: _eras.length,
             onPageChanged: (i) => setState(() => _currentPage = i),
             itemBuilder: (context, i) => _EraPage(
