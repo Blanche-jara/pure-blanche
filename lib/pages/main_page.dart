@@ -292,28 +292,27 @@ class _MainPageState extends State<MainPage>
     return Column(
       children: [
         Expanded(
-          child: Center(
-            child: SingleChildScrollView(
-              physics: const NeverScrollableScrollPhysics(),
-              child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isMobile ? 16 : 40,
+          child: isMobile
+              ? SingleChildScrollView(
+                  physics: const ClampingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 32, 16, 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: _buildCards(context, double.infinity, true),
+                  ),
+                )
+              : Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 40),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1200),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: _buildCards(context, null, false),
+                      ),
+                    ),
+                  ),
                 ),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
-                  child: isMobile
-                      ? Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: _buildCards(context, double.infinity),
-                        )
-                      : Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: _buildCards(context, null),
-                        ),
-                ),
-              ),
-            ),
-          ),
         ),
         Container(
           width: double.infinity,
@@ -337,7 +336,8 @@ class _MainPageState extends State<MainPage>
     );
   }
 
-  List<Widget> _buildCards(BuildContext context, double? fixedWidth) {
+  List<Widget> _buildCards(
+      BuildContext context, double? fixedWidth, bool compact) {
     final cards = [
       _NavCardData(
         icon: Icons.code,
@@ -367,12 +367,13 @@ class _MainPageState extends State<MainPage>
       final data = entry.value;
       final card = _NavigationCard(
         data: data,
+        compact: compact,
         onTap: () => Navigator.pushNamed(context, data.route),
       );
 
       if (fixedWidth != null) {
         return Padding(
-          padding: EdgeInsets.only(bottom: i < cards.length - 1 ? 16 : 0),
+          padding: EdgeInsets.only(bottom: i < cards.length - 1 ? 12 : 0),
           child: card,
         );
       } else {
@@ -409,8 +410,13 @@ class _NavCardData {
 class _NavigationCard extends StatefulWidget {
   final _NavCardData data;
   final VoidCallback onTap;
+  final bool compact;
 
-  const _NavigationCard({required this.data, required this.onTap});
+  const _NavigationCard({
+    required this.data,
+    required this.onTap,
+    this.compact = false,
+  });
 
   @override
   State<_NavigationCard> createState() => _NavigationCardState();
@@ -421,6 +427,14 @@ class _NavigationCardState extends State<_NavigationCard> {
 
   @override
   Widget build(BuildContext context) {
+    final compact = widget.compact;
+    final pad = compact ? 20.0 : 32.0;
+    final iconSize = compact ? 24.0 : 28.0;
+    final titleSize = compact ? 20.0 : 24.0;
+    final descSize = compact ? 14.0 : 15.0;
+    final gapL = compact ? 16.0 : 24.0;
+    final gapS = compact ? 6.0 : 8.0;
+
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -429,7 +443,7 @@ class _NavigationCardState extends State<_NavigationCard> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
-          padding: const EdgeInsets.all(32),
+          padding: EdgeInsets.all(pad),
           decoration: BoxDecoration(
             color: AppColors.carbon,
             borderRadius: BorderRadius.circular(8),
@@ -455,7 +469,7 @@ class _NavigationCardState extends State<_NavigationCard> {
                 children: [
                   Icon(
                     widget.data.icon,
-                    size: 28,
+                    size: iconSize,
                     color: _hovered
                         ? AppColors.signalGreen
                         : AppColors.steel,
@@ -475,29 +489,29 @@ class _NavigationCardState extends State<_NavigationCard> {
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: gapL),
               Text(
                 widget.data.title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'Segoe UI',
-                  fontSize: 24,
+                  fontSize: titleSize,
                   fontWeight: FontWeight.w700,
                   height: 1.33,
                   letterSpacing: -0.6,
                   color: AppColors.snow,
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: gapS),
               Text(
                 widget.data.description,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'Inter',
-                  fontSize: 15,
+                  fontSize: descSize,
                   height: 1.6,
                   color: AppColors.parchment,
                 ),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: gapL),
               Row(
                 children: [
                   AnimatedDefaultTextStyle(
