@@ -4,33 +4,36 @@
 `youtubeId`는 YouTube URL의 `v=` 뒤 또는 `youtu.be/` 뒤 ID입니다.
 빈 칸은 아직 미등록 상태입니다.
 
-## 2016
+## 2017
 **label**: 입문기
-**description**: 영상 편집을 처음 시작한 시기. 기초 편집, 자막, 간단한 모션.
+**sub-title**: 영상 편집을 처음 시작한 시기. 
+**description**: 간단한 모션과 이펙트들을 기반으로, 다양한 영상과 커미션을 받아 나갔습니다. 취미가 맞는 사람들끼리 모여서 작업을 하는 소위 '동인계' 영상
 
 ### 메인 영상
-- title: 메인 영상 | youtubeId: 
+- title: 메인 영상 | youtubeId: BjOOpgE40fk
 
 ### 서브 영상
 1. title: 서브 영상 1 | youtubeId: 
 2. title: 서브 영상 2 | youtubeId: 
-3. title: 서브 영상 3 | youtubeId: 
-
-## 2018
-**label**: 동인계
-**description**: 동인계 영상 작업. 팬 무비, MAD, AMV 등 2차 창작 기반의 영상 편집을 시작한 시기.
-
-### 메인 영상
-- title: 메인 영상 | youtubeId: 
-
-### 서브 영상
-1. title: 서브 영상 1 | youtubeId: 
-2. title: 서브 영상 2 | youtubeId: 
-3. title: 서브 영상 3 | youtubeId: 
+3. title: 서브 영상 3 | youtubeId:
 
 ## 2019
 **label**: 게임 그래픽
 **description**: 게임 그래픽 작업으로 전환. 인게임 트레일러, 모션 그래픽, UI 애니메이션 등.
+
+### 메인 영상
+- title: 메인 영상 | youtubeId: yM5RXxaQXxE
+
+### 서브 영상
+1. title: 서브 영상 1 | youtubeId: ijkLaY7VJAs
+2. title: 서브 영상 2 | youtubeId: zpeZJogeZOQ
+3. title: 서브 영상 3 | youtubeId: ijkLaY7VJAs
+4. title: 서브 영상 4 | youtubeId: TmMMzqzyk40
+ 
+
+## 2020
+**label**: 편집자/유튜브 매니징
+**description**: 
 
 ### 메인 영상
 - title: 메인 영상 | youtubeId: 
