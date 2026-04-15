@@ -158,6 +158,7 @@ class _VideoProjectsPageState extends State<VideoProjectsPage>
   late final Animation<Alignment> _introTimelineAlign;
   late final Animation<double> _introSidebarSlide;
   late final Animation<double> _introContentFade;
+  late final Animation<double> _introOverlayFade;
 
   @override
   void initState() {
@@ -215,6 +216,16 @@ class _VideoProjectsPageState extends State<VideoProjectsPage>
         tween: Tween(begin: 0.0, end: 1.0)
             .chain(CurveTween(curve: Curves.easeOut)),
         weight: 30,
+      ),
+    ]).animate(_introController);
+
+    // Intro overlay fades out during phase 3, overlapping with content fade-in
+    _introOverlayFade = TweenSequence<double>([
+      TweenSequenceItem(tween: ConstantTween(1), weight: 75),
+      TweenSequenceItem(
+        tween: Tween(begin: 1.0, end: 0.0)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 25,
       ),
     ]).animate(_introController);
 
@@ -280,12 +291,8 @@ class _VideoProjectsPageState extends State<VideoProjectsPage>
       body: AnimatedBuilder(
         animation: _introController,
         builder: (context, _) {
-          if (_introPlaying && !isMobile) {
-            return _buildIntroOverlay(context, isMobile);
-          }
-          return Column(
+          final mainLayout = Column(
             children: [
-              // Top bar fades in
               FadeTransition(
                 opacity: _introContentFade,
                 child: _buildTopBar(context, isMobile),
@@ -297,6 +304,21 @@ class _VideoProjectsPageState extends State<VideoProjectsPage>
                         child: _buildMobileBody(),
                       )
                     : _buildDesktopBodyWithIntro(),
+              ),
+            ],
+          );
+
+          if (!_introPlaying || isMobile) return mainLayout;
+
+          // Stack: real layout fades in underneath, intro overlay fades out on top
+          return Stack(
+            children: [
+              mainLayout,
+              IgnorePointer(
+                child: Opacity(
+                  opacity: _introOverlayFade.value,
+                  child: _buildIntroOverlay(context, isMobile),
+                ),
               ),
             ],
           );
