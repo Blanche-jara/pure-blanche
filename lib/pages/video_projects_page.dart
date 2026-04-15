@@ -1,6 +1,5 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:pointer_interceptor/pointer_interceptor.dart';
 import '../theme/app_colors.dart';
 import '../widgets/youtube_player.dart';
 
@@ -148,6 +147,7 @@ class _VideoProjectsPageState extends State<VideoProjectsPage>
   late final PageController _pageController;
   int _currentPage = 0;
   bool _scrollLocked = false;
+  bool? _lastIsMobile;
   static const _scrollCooldown = Duration(milliseconds: 800);
 
   // Intro animation
@@ -285,6 +285,20 @@ class _VideoProjectsPageState extends State<VideoProjectsPage>
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.sizeOf(context).width < 768;
+
+    // When the layout switches (desktop <-> mobile), the old PageView
+    // detaches from the shared PageController and a new one attaches,
+    // resetting the visible page to 0. Restore _currentPage after mount.
+    if (_lastIsMobile != null && _lastIsMobile != isMobile) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (_pageController.hasClients &&
+            _pageController.page?.round() != _currentPage) {
+          _pageController.jumpToPage(_currentPage);
+        }
+      });
+    }
+    _lastIsMobile = isMobile;
 
     return Scaffold(
       backgroundColor: AppColors.abyss,
@@ -791,26 +805,18 @@ class _HeroVideoState extends State<_HeroVideo> {
   Widget build(BuildContext context) {
     // If youtubeId exists, show embedded player
     if (widget.clip.hasVideo) {
-      return Stack(
-        children: [
-          Container(
-            width: double.infinity,
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              color: AppColors.carbon,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.warmCharcoal),
-            ),
-            child: YoutubePlayer(
-              youtubeId: widget.clip.youtubeId!,
-              autoplay: true,
-            ),
-          ),
-          // Intercept pointer events from iframe so scroll reaches PageView
-          Positioned.fill(
-            child: PointerInterceptor(child: SizedBox.expand()),
-          ),
-        ],
+      return Container(
+        width: double.infinity,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: AppColors.carbon,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.warmCharcoal),
+        ),
+        child: YoutubePlayer(
+          youtubeId: widget.clip.youtubeId!,
+          autoplay: true,
+        ),
       );
     }
 
