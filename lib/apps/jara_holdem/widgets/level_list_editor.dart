@@ -204,29 +204,33 @@ class _BlindLevelCard extends StatelessWidget {
                     const SizedBox(width: 14),
                     // SB / BB display
                     Expanded(
-                      child: Row(
-                        children: [
-                          _ValueChip(label: 'SB', value: level.smallBlind),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 6),
-                            child: Text('/', style: TextStyle(color: Colors.white24, fontSize: 18)),
-                          ),
-                          _ValueChip(label: 'BB', value: level.bigBlind),
-                          if (level.ante > 0) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.shade900.withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                'A ${level.ante}',
-                                style: const TextStyle(color: Colors.orange, fontSize: 12),
-                              ),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        physics: const NeverScrollableScrollPhysics(),
+                        child: Row(
+                          children: [
+                            _ValueChip(label: 'SB', value: level.smallBlind),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 6),
+                              child: Text('/', style: TextStyle(color: Colors.white24, fontSize: 18)),
                             ),
+                            _ValueChip(label: 'BB', value: level.bigBlind),
+                            if (level.ante > 0) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.shade900.withValues(alpha: 0.5),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'A ${level.ante}',
+                                  style: const TextStyle(color: Colors.orange, fontSize: 12),
+                                ),
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                     // Duration badge
