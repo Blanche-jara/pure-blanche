@@ -32,7 +32,7 @@
 - YouTube iframe embed (youtube-nocookie.com)
 - Design system based on VoltAgent dark theme
 
-## Development
+## Development 
 
 ```bash
 flutter run -d chrome        # dev server

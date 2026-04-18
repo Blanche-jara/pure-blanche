@@ -90,8 +90,8 @@ class _SetupScreenState extends State<SetupScreen> {
   }
 
   Widget _buildLevelContent() {
-    if (_isCashGame) return _buildCashGameEditor();
-    if (_levels.isEmpty) return _buildImportView();
+    if (_isCashGame) return Expanded(child: _buildCashGameEditor());
+    if (_levels.isEmpty) return Expanded(child: _buildImportView());
     return Expanded(
       child: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: 80),
@@ -143,7 +143,7 @@ class _SetupScreenState extends State<SetupScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Left pane: settings
+        // Left pane: preset selector + name field only
         SizedBox(
           width: 320,
           child: Column(
@@ -154,28 +154,29 @@ class _SetupScreenState extends State<SetupScreen> {
                 padding: const EdgeInsets.all(12),
                 child: _buildNameField(),
               ),
-              if (_isCashGame) _buildCashGameEditor(),
-              if (!_isCashGame && _levels.isEmpty) _buildImportView(),
             ],
           ),
         ),
         // Vertical divider
         const VerticalDivider(color: Colors.white12, width: 1),
-        // Right pane: level list
-        if (!_isCashGame && _levels.isNotEmpty)
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: LevelListEditor(
-                levels: _levels,
-                onChanged: (newLevels) {
-                  setState(() {
-                    _levels = newLevels;
-                  });
-                },
-              ),
-            ),
-          ),
+        // Right pane: the main content area (cash editor / level list / import)
+        Expanded(
+          child: _isCashGame
+              ? _buildCashGameEditor()
+              : _levels.isEmpty
+                  ? _buildImportView()
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: LevelListEditor(
+                        levels: _levels,
+                        onChanged: (newLevels) {
+                          setState(() {
+                            _levels = newLevels;
+                          });
+                        },
+                      ),
+                    ),
+        ),
       ],
     );
   }
@@ -222,83 +223,88 @@ class _SetupScreenState extends State<SetupScreen> {
     final sbController = TextEditingController(text: blind.smallBlind.toString());
     final bbController = TextEditingController(text: blind.bigBlind.toString());
 
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.casino, color: Colors.cyan, size: 48),
-            const SizedBox(height: 16),
-            const Text(
-              'Cash Game Mode',
-              style: TextStyle(color: Colors.cyan, fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Single level with no time limit',
-              style: TextStyle(color: Colors.white38, fontSize: 14),
-            ),
-            const SizedBox(height: 32),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: sbController,
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(color: Colors.white, fontSize: 24),
-                    textAlign: TextAlign.center,
-                    decoration: const InputDecoration(
-                      labelText: 'Small Blind',
-                      labelStyle: TextStyle(color: Colors.white54),
-                      enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-                      focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.cyan)),
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.casino, color: Colors.cyan, size: 64),
+              const SizedBox(height: 20),
+              const Text(
+                'Cash Game Mode',
+                style: TextStyle(color: Colors.cyan, fontSize: 26, fontWeight: FontWeight.bold, letterSpacing: 1),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'No structure. Single blind level with no time limit.',
+                style: TextStyle(color: Colors.white54, fontSize: 15),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 48),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: sbController,
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w600),
+                      textAlign: TextAlign.center,
+                      decoration: const InputDecoration(
+                        labelText: 'Small Blind',
+                        labelStyle: TextStyle(color: Colors.white54, fontSize: 13),
+                        contentPadding: EdgeInsets.symmetric(vertical: 18),
+                        enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                        focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.cyan, width: 2)),
+                      ),
+                      onChanged: (val) {
+                        final sb = int.tryParse(val) ?? blind.smallBlind;
+                        setState(() {
+                          _levels = [blind.copyWith(smallBlind: sb, durationMinutes: 0)];
+                        });
+                      },
                     ),
-                    onChanged: (val) {
-                      final sb = int.tryParse(val) ?? blind.smallBlind;
-                      setState(() {
-                        _levels = [blind.copyWith(smallBlind: sb, durationMinutes: 0)];
-                      });
-                    },
                   ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Text('/', style: TextStyle(color: Colors.white38, fontSize: 28)),
-                ),
-                Expanded(
-                  child: TextField(
-                    controller: bbController,
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(color: Colors.white, fontSize: 24),
-                    textAlign: TextAlign.center,
-                    decoration: const InputDecoration(
-                      labelText: 'Big Blind',
-                      labelStyle: TextStyle(color: Colors.white54),
-                      enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-                      focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.cyan)),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    child: Text('/', style: TextStyle(color: Colors.white38, fontSize: 36)),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: bbController,
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w600),
+                      textAlign: TextAlign.center,
+                      decoration: const InputDecoration(
+                        labelText: 'Big Blind',
+                        labelStyle: TextStyle(color: Colors.white54, fontSize: 13),
+                        contentPadding: EdgeInsets.symmetric(vertical: 18),
+                        enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                        focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.cyan, width: 2)),
+                      ),
+                      onChanged: (val) {
+                        final bb = int.tryParse(val) ?? blind.bigBlind;
+                        setState(() {
+                          _levels = [blind.copyWith(bigBlind: bb, durationMinutes: 0)];
+                        });
+                      },
                     ),
-                    onChanged: (val) {
-                      final bb = int.tryParse(val) ?? blind.bigBlind;
-                      setState(() {
-                        _levels = [blind.copyWith(bigBlind: bb, durationMinutes: 0)];
-                      });
-                    },
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildImportView() {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
           children: [
             const SizedBox(height: 8),
             // Format guide
@@ -365,7 +371,8 @@ class _SetupScreenState extends State<SetupScreen> {
             ),
             const SizedBox(height: 12),
             // Import text area
-            Expanded(
+            SizedBox(
+              height: 220,
               child: _StructureImportField(
                 onImport: (levels) {
                   setState(() {
@@ -421,7 +428,6 @@ class _SetupScreenState extends State<SetupScreen> {
             const SizedBox(height: 16),
           ],
         ),
-      ),
     );
   }
 
