@@ -118,6 +118,23 @@ const _projects = [
     downloadUrl: 'https://drive.google.com/file/d/1UsKiAJHPsZe6JUVeP9EOWsg511bBOVSg/view?usp=sharing',
   ),
   _ProjectData(
+    title: "Who's the Nut?",
+    subtitle: 'whos-the-nut',
+    description:
+        '포커 미니게임 모음. 커뮤니티 5장만 보고 너트 핸드 맞히기 + '
+        '다인원 올인 시 메인/사이드 팟 분배 계산.',
+    techTags: ['Flutter', 'Dart', 'Poker Math'],
+    features: [
+      '7카드 핸드 평가 엔진',
+      'C(47,2) 너트 핸드 자동 탐색',
+      '사이드 팟 자동 계산 & 분배',
+      '청크/타이 시 odd chip 처리',
+    ],
+    icon: Icons.psychology_outlined,
+    type: 'flutter',
+    route: '/app/whos-the-nut',
+  ),
+  _ProjectData(
     title: '자마카세 인원뽑기',
     subtitle: 'roulette_app',
     description:

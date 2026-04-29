@@ -8,6 +8,7 @@ import 'apps/app_wrapper.dart';
 import 'apps/jara_holdem/jara_holdem_app.dart';
 import 'apps/roulette/roulette_main.dart';
 import 'apps/web_embed/html_app_page.dart';
+import 'apps/whos_the_nut/whos_the_nut_app.dart';
 
 void main() {
   runApp(const PureBlancheApp());
@@ -44,6 +45,10 @@ class PureBlancheApp extends StatelessWidget {
         '/app/birthday': (_) => const HtmlAppPage(
               title: '제 25회 자라 생일 선물 리스트',
               htmlPath: 'apps/birthday/index.html',
+            ),
+        '/app/whos-the-nut': (_) => const AppWrapper(
+              title: "Who's the Nut?",
+              child: WhosTheNutApp(),
             ),
       },
     );
