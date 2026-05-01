@@ -14,7 +14,7 @@ class _SidePotScreenState extends State<SidePotScreen> {
   final _rng = Random();
 
   List<_Player> _players = const [];
-  Set<int> _winners = const {};
+  Map<int, int> _places = const {}; // player idx → place (1=best, ties allowed)
   Map<int, TextEditingController> _answerCtrls = {};
 
   /// null = not yet submitted
@@ -76,15 +76,27 @@ class _SidePotScreenState extends State<SidePotScreen> {
         if (players[i].chips < maxChips) i
     ];
 
-    final winners = <int>{};
-    // Force one winner to be a short stack (avoids "leader sweeps everything")
-    winners.add(shortStackIdxs[_rng.nextInt(shortStackIdxs.length)]);
+    // Build a random ordering of player indices.
+    final ordering = List.generate(n, (i) => i)..shuffle(_rng);
 
-    // Optional 2-way chop
-    final allowChop = _rng.nextDouble() < 0.25 && n >= 3;
-    if (allowChop) {
-      while (winners.length < 2) {
-        winners.add(_rng.nextInt(n));
+    // Force 1st place to be a short stack (otherwise the leader sweeps every pot).
+    final firstIdx = shortStackIdxs[_rng.nextInt(shortStackIdxs.length)];
+    ordering.remove(firstIdx);
+    ordering.insert(0, firstIdx);
+
+    // Maybe make 1st a 2-way tie (chop at the top)
+    final allowTie = _rng.nextDouble() < 0.20 && n >= 3;
+    final places = <int, int>{};
+    if (allowTie) {
+      places[ordering[0]] = 1;
+      places[ordering[1]] = 1;
+      // Standard ranking: next player gets place 3, then 4, ...
+      for (int i = 2; i < n; i++) {
+        places[ordering[i]] = i + 1;
+      }
+    } else {
+      for (int i = 0; i < n; i++) {
+        places[ordering[i]] = i + 1;
       }
     }
 
@@ -97,7 +109,7 @@ class _SidePotScreenState extends State<SidePotScreen> {
 
     setState(() {
       _players = players;
-      _winners = winners;
+      _places = places;
       _answerCtrls = {
         for (int i = 0; i < players.length; i++)
           i: TextEditingController(),
@@ -107,7 +119,7 @@ class _SidePotScreenState extends State<SidePotScreen> {
   }
 
   void _submit() {
-    final correct = _resolveAwards(_players, _winners);
+    final correct = _resolveAwards(_players, _places);
     final user = <int, int>{};
     for (final entry in _answerCtrls.entries) {
       user[entry.key] = int.tryParse(entry.value.text.trim()) ?? 0;
@@ -144,31 +156,33 @@ class _SidePotScreenState extends State<SidePotScreen> {
     return pots;
   }
 
-  /// For each player, total awarded chips given winners + scenario.
-  /// If a pot has no eligible winners, the contribution is returned
-  /// to each contributing player (real-poker uncontested return).
-  Map<int, int> _resolveAwards(List<_Player> players, Set<int> winners) {
+  /// For each pot, the player(s) with the BEST place among eligible win.
+  /// Ties at that place chop the pot (front winner gets odd-chip remainder).
+  /// Since every player has a place, there's no "uncontested return" case —
+  /// the highest-ranked eligible player always exists.
+  Map<int, int> _resolveAwards(List<_Player> players, Map<int, int> places) {
     final pots = _computePots(players);
-    final winnerSet = winners.map((i) => players[i]).toSet();
     final awards = <int, int>{for (int i = 0; i < players.length; i++) i: 0};
     for (final pot in pots) {
-      final eligibleWinners =
-          pot.eligible.where((p) => winnerSet.contains(p)).toList();
-      if (eligibleWinners.isEmpty) {
-        // Uncontested → each eligible contributor gets their stake back.
-        final per = pot.amount ~/ pot.eligible.length;
-        for (final p in pot.eligible) {
-          final idx = players.indexOf(p);
-          awards[idx] = (awards[idx] ?? 0) + per;
-        }
-        continue;
-      }
-      final share = pot.amount ~/ eligibleWinners.length;
-      final remainder = pot.amount - share * eligibleWinners.length;
-      for (int j = 0; j < eligibleWinners.length; j++) {
+      // Indices of eligible players for this pot
+      final eligibleIdxs = <int>[
+        for (int i = 0; i < players.length; i++)
+          if (pot.eligible.contains(players[i])) i,
+      ];
+      if (eligibleIdxs.isEmpty) continue;
+
+      // Best (lowest) place number among eligible
+      final bestPlace = eligibleIdxs
+          .map((i) => places[i] ?? 9999)
+          .reduce((a, b) => a < b ? a : b);
+      final winners =
+          eligibleIdxs.where((i) => places[i] == bestPlace).toList();
+
+      final share = pot.amount ~/ winners.length;
+      final remainder = pot.amount - share * winners.length;
+      for (int j = 0; j < winners.length; j++) {
         final extra = j < remainder ? 1 : 0;
-        final idx = players.indexOf(eligibleWinners[j]);
-        awards[idx] = (awards[idx] ?? 0) + share + extra;
+        awards[winners[j]] = (awards[winners[j]] ?? 0) + share + extra;
       }
     }
     return awards;
@@ -207,8 +221,8 @@ class _SidePotScreenState extends State<SidePotScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            '· WIN이 여러 명이면 쇼다운 동률(chop) → 자격 있는 팟을 분배\n'
-            '· 자격 있는 승자가 없는 팟은 컨트리뷰터에게 환급',
+            '· 각 팟은 자격 있는 플레이어 중 가장 높은 순위가 가져감\n'
+            '· 같은 순위가 여러 명(tie)이면 분배 (chop)',
             style: TextStyle(
               color: Colors.white24,
               fontSize: 11,
@@ -226,7 +240,7 @@ class _SidePotScreenState extends State<SidePotScreen> {
           ..._players.asMap().entries.map((entry) {
             final i = entry.key;
             final p = entry.value;
-            final isWinner = _winners.contains(i);
+            final place = _places[i] ?? 0;
             final ctrl = _answerCtrls[i]!;
             final result = _grade?.perPlayer[i];
             final correct = _grade?.correctAwards[i];
@@ -234,7 +248,7 @@ class _SidePotScreenState extends State<SidePotScreen> {
               padding: const EdgeInsets.only(bottom: 10),
               child: _PlayerQuizRow(
                 player: p,
-                isWinner: isWinner,
+                place: place,
                 controller: ctrl,
                 graded: result,
                 correctAward: correct,
@@ -450,7 +464,7 @@ class _GradeResult {
 
 class _PlayerQuizRow extends StatelessWidget {
   final _Player player;
-  final bool isWinner;
+  final int place;
   final TextEditingController controller;
   final bool? graded;
   final int? correctAward;
@@ -458,7 +472,7 @@ class _PlayerQuizRow extends StatelessWidget {
 
   const _PlayerQuizRow({
     required this.player,
-    required this.isWinner,
+    required this.place,
     required this.controller,
     required this.graded,
     required this.correctAward,
@@ -467,13 +481,14 @@ class _PlayerQuizRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = isWinner ? Colors.green : Colors.white24;
     Color resultColor = Colors.transparent;
     IconData? resultIcon;
     if (graded != null) {
       resultColor = graded! ? Colors.green.shade400 : Colors.red.shade400;
       resultIcon = graded! ? Icons.check_circle_outline : Icons.cancel_outlined;
     }
+
+    final placeAccent = _placeColor(place);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -482,9 +497,9 @@ class _PlayerQuizRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: graded == null
-              ? (isWinner ? Colors.green.shade700 : Colors.white12)
+              ? (place == 1 ? placeAccent.withValues(alpha: 0.6) : Colors.white12)
               : resultColor.withValues(alpha: 0.5),
-          width: graded == null ? (isWinner ? 1.5 : 1) : 1.5,
+          width: graded == null ? (place == 1 ? 1.5 : 1) : 1.5,
         ),
       ),
       child: Row(
@@ -525,48 +540,8 @@ class _PlayerQuizRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          // Winner badge (read-only)
-          if (isWinner)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.green.shade700,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Icon(Icons.emoji_events, size: 14, color: Colors.white),
-                  SizedBox(width: 4),
-                  Text(
-                    'WIN',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      letterSpacing: 1.4,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.white12),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                'LOSE',
-                style: TextStyle(
-                  color: accent,
-                  fontSize: 10,
-                  letterSpacing: 1.4,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
+          // Place badge (1ST / 2ND / 3RD / 4TH ...)
+          _PlaceBadge(place: place),
           const Spacer(),
           // Award input
           SizedBox(
@@ -871,6 +846,73 @@ class _ActionBtnState extends State<_ActionBtn> {
 }
 
 // ───────────────────────── Helpers ─────────────────────────
+
+// ───────────────────────── Place helpers ─────────────────────────
+
+String _placeLabel(int place) {
+  switch (place) {
+    case 1:
+      return '1ST';
+    case 2:
+      return '2ND';
+    case 3:
+      return '3RD';
+    default:
+      return '${place}TH';
+  }
+}
+
+Color _placeColor(int place) {
+  switch (place) {
+    case 1:
+      return Colors.amber.shade400; // gold
+    case 2:
+      return Colors.grey.shade400; // silver
+    case 3:
+      return const Color(0xFFCD7F32); // bronze
+    default:
+      return Colors.grey.shade700;
+  }
+}
+
+class _PlaceBadge extends StatelessWidget {
+  final int place;
+  const _PlaceBadge({required this.place});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _placeColor(place);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: place <= 3
+            ? color.withValues(alpha: 0.18)
+            : Colors.white.withValues(alpha: 0.04),
+        border: Border.all(color: color.withValues(alpha: 0.6)),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (place == 1)
+            Icon(Icons.emoji_events, size: 13, color: color)
+          else
+            Icon(Icons.workspace_premium_outlined, size: 13, color: color),
+          const SizedBox(width: 4),
+          Text(
+            _placeLabel(place),
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              letterSpacing: 1.4,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 String _fmt(int n) {
   final s = n.toString();
