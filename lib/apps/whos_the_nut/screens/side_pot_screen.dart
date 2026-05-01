@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -10,67 +11,127 @@ class SidePotScreen extends StatefulWidget {
 }
 
 class _SidePotScreenState extends State<SidePotScreen> {
-  final List<_PlayerInput> _players = [
-    _PlayerInput(name: 'P1', chips: 1000),
-    _PlayerInput(name: 'P2', chips: 3000),
-    _PlayerInput(name: 'P3', chips: 5000),
-  ];
+  final _rng = Random();
 
-  /// Indices of winning players (allows multi-winner = chop)
-  final Set<int> _winners = {2};
+  List<_Player> _players = const [];
+  Set<int> _winners = const {};
+  Map<int, TextEditingController> _answerCtrls = {};
 
-  List<_Pot>? _pots;
+  /// null = not yet submitted
+  _GradeResult? _grade;
 
-  void _addPlayer() {
-    setState(() {
-      final n = _players.length + 1;
-      _players.add(_PlayerInput(name: 'P$n', chips: 0));
-      _pots = null;
-    });
+  bool _hardMode = false;
+
+  // Theme-derived colors based on hard mode
+  Color get _accent =>
+      _hardMode ? Colors.red.shade300 : Colors.amber.shade300;
+  Color get _feltBg =>
+      _hardMode ? const Color(0xFF2E0E0E) : const Color(0xFF0E2E0E);
+  Color get _feltBorder =>
+      _hardMode ? Colors.red.shade900 : Colors.green.shade900;
+  Color get _feltLabel =>
+      _hardMode ? Colors.red.shade300 : Colors.green.shade300;
+
+  @override
+  void initState() {
+    super.initState();
+    _newScenario();
   }
 
-  void _removePlayer(int index) {
-    setState(() {
-      _players.removeAt(index);
-      // Reindex winners
-      final newWinners = <int>{};
-      for (final w in _winners) {
-        if (w < index) newWinners.add(w);
-        if (w > index) newWinners.add(w - 1);
+  @override
+  void dispose() {
+    for (final c in _answerCtrls.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  /// Generate a random side-pot scenario.
+  /// - 2~4 players
+  /// - Each player's chip-in is a multiple of 100 (5..50 → ×100 = 500..5000)
+  /// - At least one winner is NOT the chip leader (so the puzzle is non-trivial:
+  ///   if the chip leader were the only winner, the answer would just be the total pot).
+  /// - 1 winner most of the time, 2-way chop occasionally.
+  void _newScenario() {
+    final n = 2 + _rng.nextInt(3); // 2..4
+    final players = List.generate(n, (i) {
+      final chips = (5 + _rng.nextInt(46)) * 100; // 500..5000 step 100
+      return _Player(name: 'P${i + 1}', chips: chips);
+    });
+
+    // Make sure not all players have identical chips.
+    final unique = players.map((p) => p.chips).toSet();
+    if (unique.length == 1) {
+      players[0] = _Player(
+        name: players[0].name,
+        chips: players[0].chips + 100 * (1 + _rng.nextInt(5)),
+      );
+    }
+
+    // Indices of players whose stack is strictly less than the leader.
+    final maxChips =
+        players.map((p) => p.chips).reduce((a, b) => a > b ? a : b);
+    final shortStackIdxs = [
+      for (int i = 0; i < players.length; i++)
+        if (players[i].chips < maxChips) i
+    ];
+
+    final winners = <int>{};
+    // Force one winner to be a short stack (avoids "leader sweeps everything")
+    winners.add(shortStackIdxs[_rng.nextInt(shortStackIdxs.length)]);
+
+    // Optional 2-way chop
+    final allowChop = _rng.nextDouble() < 0.25 && n >= 3;
+    if (allowChop) {
+      while (winners.length < 2) {
+        winners.add(_rng.nextInt(n));
       }
-      _winners
-        ..clear()
-        ..addAll(newWinners);
-      _pots = null;
-    });
-  }
+    }
 
-  void _toggleWinner(int index) {
-    setState(() {
-      if (_winners.contains(index)) {
-        _winners.remove(index);
-      } else {
-        _winners.add(index);
+    // Dispose old controllers
+    if (mounted) {
+      for (final c in _answerCtrls.values) {
+        c.dispose();
       }
-      _pots = null;
-    });
-  }
+    }
 
-  void _calculate() {
-    if (_players.isEmpty || _winners.isEmpty) return;
-    final pots = _computePots(_players);
     setState(() {
-      _pots = pots;
+      _players = players;
+      _winners = winners;
+      _answerCtrls = {
+        for (int i = 0; i < players.length; i++)
+          i: TextEditingController(),
+      };
+      _grade = null;
     });
   }
 
-  /// Side-pot algorithm:
-  /// Sort players by chip-in ascending. Each unique level creates a pot
-  /// containing (level − prev) × (count of players who reached that level).
-  /// Eligible winners for that pot are the players whose chip-in ≥ level.
-  List<_Pot> _computePots(List<_PlayerInput> players) {
-    final levels = players.map((p) => p.chips).where((c) => c > 0).toSet().toList()
-      ..sort();
+  void _submit() {
+    final correct = _resolveAwards(_players, _winners);
+    final user = <int, int>{};
+    for (final entry in _answerCtrls.entries) {
+      user[entry.key] = int.tryParse(entry.value.text.trim()) ?? 0;
+    }
+    final perPlayer = <int, bool>{
+      for (int i = 0; i < _players.length; i++)
+        i: (user[i] ?? 0) == (correct[i] ?? 0),
+    };
+    final allCorrect = perPlayer.values.every((v) => v);
+    setState(() {
+      _grade = _GradeResult(
+        userAwards: user,
+        correctAwards: correct,
+        perPlayer: perPlayer,
+        allCorrect: allCorrect,
+        pots: _computePots(_players),
+      );
+    });
+  }
+
+  // Pot algorithm — same as before.
+  List<_Pot> _computePots(List<_Player> players) {
+    final levels =
+        players.map((p) => p.chips).where((c) => c > 0).toSet().toList()..sort();
     int prev = 0;
     final pots = <_Pot>[];
     for (final level in levels) {
@@ -83,48 +144,137 @@ class _SidePotScreenState extends State<SidePotScreen> {
     return pots;
   }
 
+  /// For each player, total awarded chips given winners + scenario.
+  /// If a pot has no eligible winners, the contribution is returned
+  /// to each contributing player (real-poker uncontested return).
+  Map<int, int> _resolveAwards(List<_Player> players, Set<int> winners) {
+    final pots = _computePots(players);
+    final winnerSet = winners.map((i) => players[i]).toSet();
+    final awards = <int, int>{for (int i = 0; i < players.length; i++) i: 0};
+    for (final pot in pots) {
+      final eligibleWinners =
+          pot.eligible.where((p) => winnerSet.contains(p)).toList();
+      if (eligibleWinners.isEmpty) {
+        // Uncontested → each eligible contributor gets their stake back.
+        final per = pot.amount ~/ pot.eligible.length;
+        for (final p in pot.eligible) {
+          final idx = players.indexOf(p);
+          awards[idx] = (awards[idx] ?? 0) + per;
+        }
+        continue;
+      }
+      final share = pot.amount ~/ eligibleWinners.length;
+      final remainder = pot.amount - share * eligibleWinners.length;
+      for (int j = 0; j < eligibleWinners.length; j++) {
+        final extra = j < remainder ? 1 : 0;
+        final idx = players.indexOf(eligibleWinners[j]);
+        awards[idx] = (awards[idx] ?? 0) + share + extra;
+      }
+    }
+    return awards;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final totalPot = _players.fold<int>(0, (s, p) => s + p.chips);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _label('PLAYERS (ALL-IN AMOUNTS)'),
-          const SizedBox(height: 12),
+          // Top row: SCENARIO label + HARD MODE toggle
+          Row(
+            children: [
+              _label('SCENARIO'),
+              const Spacer(),
+              _HardModeToggle(
+                value: _hardMode,
+                onChanged: (v) => setState(() {
+                  _hardMode = v;
+                }),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '각 플레이어가 얻는 칩 수를 입력하세요 (단위: 칩)',
+            style: TextStyle(
+              color: Colors.white38,
+              fontSize: 13,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '· WIN이 여러 명이면 쇼다운 동률(chop) → 자격 있는 팟을 분배\n'
+            '· 자격 있는 승자가 없는 팟은 컨트리뷰터에게 환급',
+            style: TextStyle(
+              color: Colors.white24,
+              fontSize: 11,
+              height: 1.6,
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Total pot (read-only)
+          _totalPotBanner(totalPot),
+
+          const SizedBox(height: 16),
+
+          // Player rows
           ..._players.asMap().entries.map((entry) {
             final i = entry.key;
+            final p = entry.value;
+            final isWinner = _winners.contains(i);
+            final ctrl = _answerCtrls[i]!;
+            final result = _grade?.perPlayer[i];
+            final correct = _grade?.correctAwards[i];
             return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _PlayerRow(
-                input: entry.value,
-                isWinner: _winners.contains(i),
-                onWinnerTap: () => _toggleWinner(i),
-                onRemove: _players.length > 2 ? () => _removePlayer(i) : null,
-                onChanged: () => setState(() => _pots = null),
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _PlayerQuizRow(
+                player: p,
+                isWinner: isWinner,
+                controller: ctrl,
+                graded: result,
+                correctAward: correct,
+                locked: _grade != null,
               ),
             );
           }),
-          const SizedBox(height: 8),
-          _AddButton(onTap: _addPlayer),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 18),
 
-          _ActionBtn(
-            label: 'CALCULATE',
-            icon: Icons.calculate,
-            onTap: _winners.isNotEmpty ? _calculate : null,
+          // Action buttons
+          Row(
+            children: [
+              Expanded(
+                child: _ActionBtn(
+                  label: 'NEW SCENARIO',
+                  icon: Icons.shuffle,
+                  primary: false,
+                  onTap: _newScenario,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                flex: 2,
+                child: _ActionBtn(
+                  label: _grade == null ? 'SUBMIT' : 'GRADED',
+                  icon: Icons.check,
+                  primary: true,
+                  onTap: _grade == null ? _submit : null,
+                ),
+              ),
+            ],
           ),
 
-          if (_pots != null) ...[
-            const SizedBox(height: 28),
-            _label('RESULT'),
-            const SizedBox(height: 12),
-            _ResultBoard(
-              players: _players,
-              pots: _pots!,
-              winners: _winners,
-            ),
+          // Verdict + breakdown
+          if (_grade != null) ...[
+            const SizedBox(height: 24),
+            _VerdictPanel(grade: _grade!),
+            const SizedBox(height: 16),
+            _BreakdownPanel(grade: _grade!, players: _players),
           ],
         ],
       ),
@@ -135,236 +285,128 @@ class _SidePotScreenState extends State<SidePotScreen> {
     return Text(
       text,
       style: GoogleFonts.orbitron(
-        color: Colors.amber.shade300,
+        color: _accent,
         fontSize: 13,
         fontWeight: FontWeight.w700,
         letterSpacing: 3,
       ),
     );
   }
-}
 
-// ───────────────────────── Player row ─────────────────────────
-
-class _PlayerInput {
-  String name;
-  int chips;
-  _PlayerInput({required this.name, required this.chips});
-}
-
-class _PlayerRow extends StatefulWidget {
-  final _PlayerInput input;
-  final bool isWinner;
-  final VoidCallback onWinnerTap;
-  final VoidCallback? onRemove;
-  final VoidCallback onChanged;
-
-  const _PlayerRow({
-    required this.input,
-    required this.isWinner,
-    required this.onWinnerTap,
-    required this.onChanged,
-    this.onRemove,
-  });
-
-  @override
-  State<_PlayerRow> createState() => _PlayerRowState();
-}
-
-class _PlayerRowState extends State<_PlayerRow> {
-  late TextEditingController _nameCtrl;
-  late TextEditingController _chipsCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _nameCtrl = TextEditingController(text: widget.input.name);
-    _chipsCtrl = TextEditingController(text: widget.input.chips.toString());
-  }
-
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _chipsCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+  Widget _totalPotBanner(int total) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
+        color: _feltBg,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: widget.isWinner
-              ? Colors.green.shade600
-              : Colors.white.withValues(alpha: 0.08),
-          width: widget.isWinner ? 1.5 : 1,
-        ),
+        border: Border.all(color: _feltBorder),
+        boxShadow: _hardMode
+            ? [
+                BoxShadow(
+                  color: Colors.red.withValues(alpha: 0.2),
+                  blurRadius: 18,
+                ),
+              ]
+            : null,
       ),
       child: Row(
         children: [
-          // Name
-          SizedBox(
-            width: 80,
-            child: TextField(
-              controller: _nameCtrl,
-              style: GoogleFonts.rajdhani(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-              decoration: const InputDecoration(
-                isDense: true,
-                contentPadding: EdgeInsets.symmetric(vertical: 6),
-                border: InputBorder.none,
-              ),
-              onChanged: (v) {
-                widget.input.name = v;
-                widget.onChanged();
-              },
+          Icon(Icons.account_balance, color: _feltLabel, size: 18),
+          const SizedBox(width: 10),
+          Text(
+            'TOTAL POT',
+            style: GoogleFonts.orbitron(
+              color: _feltLabel,
+              fontSize: 12,
+              letterSpacing: 2,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(width: 8),
-          // Chips
-          Expanded(
-            child: TextField(
-              controller: _chipsCtrl,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontFamily: 'monospace',
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.right,
-              decoration: InputDecoration(
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 8),
-                hintText: 'chips',
-                hintStyle: const TextStyle(color: Colors.white24),
-                filled: true,
-                fillColor: Colors.black26,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              onChanged: (v) {
-                widget.input.chips = int.tryParse(v) ?? 0;
-                widget.onChanged();
-              },
+          const Spacer(),
+          Text(
+            _hardMode ? '????' : _fmt(total),
+            style: TextStyle(
+              color: _hardMode ? Colors.red.shade300 : Colors.white,
+              fontSize: 22,
+              fontFamily: 'monospace',
+              fontWeight: FontWeight.bold,
+              letterSpacing: _hardMode ? 4 : 0,
             ),
           ),
-          const SizedBox(width: 12),
-          // Winner toggle
-          GestureDetector(
-            onTap: widget.onWinnerTap,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: widget.isWinner
-                    ? Colors.green.shade700
-                    : Colors.transparent,
-                border: Border.all(
-                  color: widget.isWinner
-                      ? Colors.green.shade600
-                      : Colors.white24,
-                ),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    widget.isWinner
-                        ? Icons.emoji_events
-                        : Icons.emoji_events_outlined,
-                    size: 16,
-                    color:
-                        widget.isWinner ? Colors.white : Colors.white38,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'WIN',
-                    style: TextStyle(
-                      color: widget.isWinner ? Colors.white : Colors.white38,
-                      fontSize: 11,
-                      letterSpacing: 1.2,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // Remove
-          if (widget.onRemove != null)
-            IconButton(
-              icon: const Icon(Icons.close, size: 18, color: Colors.white24),
-              onPressed: widget.onRemove,
-              padding: const EdgeInsets.all(6),
-              constraints: const BoxConstraints(),
-            ),
         ],
       ),
     );
   }
 }
 
-// ───────────────────────── Add button ─────────────────────────
+// ───────────────────────── Hard mode toggle ─────────────────────────
 
-class _AddButton extends StatefulWidget {
-  final VoidCallback onTap;
-  const _AddButton({required this.onTap});
+class _HardModeToggle extends StatefulWidget {
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  const _HardModeToggle({required this.value, required this.onChanged});
 
   @override
-  State<_AddButton> createState() => _AddButtonState();
+  State<_HardModeToggle> createState() => _HardModeToggleState();
 }
 
-class _AddButtonState extends State<_AddButton> {
+class _HardModeToggleState extends State<_HardModeToggle> {
   bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
+    final on = widget.value;
+    final color = on ? Colors.red.shade300 : Colors.white38;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
-        onTap: widget.onTap,
+        onTap: () => widget.onChanged(!on),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(
+            color: on
+                ? Colors.red.shade900.withValues(alpha: 0.35)
+                : (_hovered
+                    ? Colors.white.withValues(alpha: 0.04)
+                    : Colors.transparent),
             border: Border.all(
-              color: _hovered
-                  ? Colors.amber.shade300
-                  : Colors.white24,
-              style: BorderStyle.solid,
+              color: on
+                  ? Colors.red.shade400
+                  : (_hovered ? Colors.white24 : Colors.white12),
+              width: on ? 1.5 : 1,
             ),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: on
+                ? [
+                    BoxShadow(
+                      color: Colors.red.withValues(alpha: 0.4),
+                      blurRadius: 10,
+                    ),
+                  ]
+                : null,
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.add,
-                color: _hovered ? Colors.amber.shade300 : Colors.white38,
-                size: 18,
+                on
+                    ? Icons.local_fire_department
+                    : Icons.local_fire_department_outlined,
+                color: color,
+                size: 16,
               ),
               const SizedBox(width: 6),
               Text(
-                'ADD PLAYER',
-                style: TextStyle(
-                  color: _hovered ? Colors.amber.shade300 : Colors.white38,
-                  fontSize: 12,
-                  letterSpacing: 1.4,
+                'HARD MODE',
+                style: GoogleFonts.orbitron(
+                  color: color,
+                  fontSize: 11,
                   fontWeight: FontWeight.w700,
+                  letterSpacing: 1.8,
                 ),
               ),
             ],
@@ -375,15 +417,392 @@ class _AddButtonState extends State<_AddButton> {
   }
 }
 
+// ───────────────────────── Models ─────────────────────────
+
+class _Player {
+  final String name;
+  final int chips;
+  _Player({required this.name, required this.chips});
+}
+
+class _Pot {
+  final int amount;
+  final List<_Player> eligible;
+  _Pot({required this.amount, required this.eligible});
+}
+
+class _GradeResult {
+  final Map<int, int> userAwards;
+  final Map<int, int> correctAwards;
+  final Map<int, bool> perPlayer;
+  final bool allCorrect;
+  final List<_Pot> pots;
+  _GradeResult({
+    required this.userAwards,
+    required this.correctAwards,
+    required this.perPlayer,
+    required this.allCorrect,
+    required this.pots,
+  });
+}
+
+// ───────────────────────── Player quiz row ─────────────────────────
+
+class _PlayerQuizRow extends StatelessWidget {
+  final _Player player;
+  final bool isWinner;
+  final TextEditingController controller;
+  final bool? graded;
+  final int? correctAward;
+  final bool locked;
+
+  const _PlayerQuizRow({
+    required this.player,
+    required this.isWinner,
+    required this.controller,
+    required this.graded,
+    required this.correctAward,
+    required this.locked,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = isWinner ? Colors.green : Colors.white24;
+    Color resultColor = Colors.transparent;
+    IconData? resultIcon;
+    if (graded != null) {
+      resultColor = graded! ? Colors.green.shade400 : Colors.red.shade400;
+      resultIcon = graded! ? Icons.check_circle_outline : Icons.cancel_outlined;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: graded == null
+              ? (isWinner ? Colors.green.shade700 : Colors.white12)
+              : resultColor.withValues(alpha: 0.5),
+          width: graded == null ? (isWinner ? 1.5 : 1) : 1.5,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Name
+          SizedBox(
+            width: 48,
+            child: Text(
+              player.name,
+              style: GoogleFonts.rajdhani(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          // Chips in pot
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.black26,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.savings_outlined, color: Colors.white38, size: 14),
+                const SizedBox(width: 6),
+                Text(
+                  _fmt(player.chips),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Winner badge (read-only)
+          if (isWinner)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.green.shade700,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.emoji_events, size: 14, color: Colors.white),
+                  SizedBox(width: 4),
+                  Text(
+                    'WIN',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      letterSpacing: 1.4,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.white12),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'LOSE',
+                style: TextStyle(
+                  color: accent,
+                  fontSize: 10,
+                  letterSpacing: 1.4,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          const Spacer(),
+          // Award input
+          SizedBox(
+            width: 120,
+            child: TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              enabled: !locked,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                color: graded == null
+                    ? Colors.white
+                    : resultColor,
+                fontSize: 18,
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.bold,
+              ),
+              decoration: InputDecoration(
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 8),
+                hintText: '?',
+                hintStyle: const TextStyle(color: Colors.white24),
+                filled: true,
+                fillColor: Colors.black26,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: BorderSide(
+                    color: graded == null
+                        ? Colors.white12
+                        : resultColor.withValues(alpha: 0.5),
+                  ),
+                ),
+                disabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: BorderSide(
+                    color: resultColor.withValues(alpha: 0.5),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: BorderSide(color: Colors.amber.shade300),
+                ),
+                suffixText: ' chips',
+                suffixStyle: TextStyle(
+                  color: Colors.white24,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+          ),
+          // Result icon + correct value
+          if (graded != null) ...[
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(resultIcon, color: resultColor, size: 22),
+                if (graded == false)
+                  Text(
+                    _fmt(correctAward ?? 0),
+                    style: TextStyle(
+                      color: Colors.green.shade300,
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ───────────────────────── Verdict ─────────────────────────
+
+class _VerdictPanel extends StatelessWidget {
+  final _GradeResult grade;
+  const _VerdictPanel({required this.grade});
+
+  @override
+  Widget build(BuildContext context) {
+    final color =
+        grade.allCorrect ? Colors.green.shade400 : Colors.red.shade400;
+    final correctCount = grade.perPlayer.values.where((v) => v).length;
+    final total = grade.perPlayer.length;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.5), width: 1.5),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            grade.allCorrect
+                ? Icons.check_circle_outline
+                : Icons.cancel_outlined,
+            color: color,
+            size: 28,
+          ),
+          const SizedBox(width: 10),
+          Text(
+            grade.allCorrect ? 'CORRECT!' : 'INCORRECT',
+            style: GoogleFonts.orbitron(
+              color: color,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 2,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            '$correctCount / $total',
+            style: GoogleFonts.rajdhani(
+              color: color,
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ───────────────────────── Breakdown (explanation) ─────────────────────────
+
+class _BreakdownPanel extends StatelessWidget {
+  final _GradeResult grade;
+  final List<_Player> players;
+  const _BreakdownPanel({required this.grade, required this.players});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'BREAKDOWN',
+            style: GoogleFonts.orbitron(
+              color: Colors.amber.shade300,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 2,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ..._buildPotRows(),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildPotRows() {
+    final rows = <Widget>[];
+    for (int i = 0; i < grade.pots.length; i++) {
+      final pot = grade.pots[i];
+      final isMain = i == 0;
+      final label = isMain ? 'MAIN POT' : 'SIDE POT $i';
+
+      final eligibleNames = pot.eligible.map((p) => p.name).join(', ');
+
+      rows.add(Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 90,
+              child: Text(
+                label,
+                style: GoogleFonts.orbitron(
+                  color: isMain ? Colors.amber.shade300 : Colors.white60,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
+            Text(
+              _fmt(pot.amount),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'eligible: $eligibleNames',
+                style: const TextStyle(
+                  color: Colors.white38,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ));
+    }
+    return rows;
+  }
+}
+
 // ───────────────────────── Action button ─────────────────────────
 
 class _ActionBtn extends StatefulWidget {
   final String label;
   final IconData icon;
+  final bool primary;
   final VoidCallback? onTap;
   const _ActionBtn({
     required this.label,
     required this.icon,
+    required this.primary,
     required this.onTap,
   });
 
@@ -397,9 +816,9 @@ class _ActionBtnState extends State<_ActionBtn> {
   @override
   Widget build(BuildContext context) {
     final disabled = widget.onTap == null;
+    final accent = widget.primary ? Colors.green : Colors.amber.shade700;
     return MouseRegion(
-      cursor:
-          disabled ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
+      cursor: disabled ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
@@ -408,9 +827,17 @@ class _ActionBtnState extends State<_ActionBtn> {
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
-            color: disabled
-                ? Colors.white12
-                : (_hovered ? Colors.green.shade600 : Colors.green.shade700),
+            color: widget.primary
+                ? (disabled
+                    ? Colors.white12
+                    : (_hovered ? Colors.green.shade600 : Colors.green.shade700))
+                : Colors.transparent,
+            border: Border.all(
+              color: disabled
+                  ? Colors.white24
+                  : (_hovered ? accent : accent.withValues(alpha: 0.6)),
+              width: 1.5,
+            ),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
@@ -419,16 +846,20 @@ class _ActionBtnState extends State<_ActionBtn> {
               Icon(
                 widget.icon,
                 size: 18,
-                color: disabled ? Colors.white24 : Colors.white,
+                color: disabled
+                    ? Colors.white24
+                    : (widget.primary ? Colors.white : accent),
               ),
               const SizedBox(width: 10),
               Text(
                 widget.label,
                 style: GoogleFonts.orbitron(
-                  color: disabled ? Colors.white24 : Colors.white,
-                  fontSize: 14,
+                  color: disabled
+                      ? Colors.white24
+                      : (widget.primary ? Colors.white : accent),
+                  fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  letterSpacing: 2,
+                  letterSpacing: 1.5,
                 ),
               ),
             ],
@@ -439,223 +870,14 @@ class _ActionBtnState extends State<_ActionBtn> {
   }
 }
 
-// ───────────────────────── Result board ─────────────────────────
+// ───────────────────────── Helpers ─────────────────────────
 
-class _Pot {
-  final int amount;
-  final List<_PlayerInput> eligible;
-  _Pot({required this.amount, required this.eligible});
-}
-
-class _ResultBoard extends StatelessWidget {
-  final List<_PlayerInput> players;
-  final List<_Pot> pots;
-  final Set<int> winners;
-
-  const _ResultBoard({
-    required this.players,
-    required this.pots,
-    required this.winners,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final winnerSet = winners.map((i) => players[i]).toSet();
-    final awards = <_PlayerInput, int>{};
-
-    final rows = <Widget>[];
-    for (int i = 0; i < pots.length; i++) {
-      final pot = pots[i];
-      final eligibleWinners =
-          pot.eligible.where((p) => winnerSet.contains(p)).toList();
-      final isMain = i == 0;
-      final label = isMain ? 'MAIN POT' : 'SIDE POT $i';
-
-      String distribution;
-      if (eligibleWinners.isEmpty) {
-        distribution = 'no eligible winner';
-      } else if (eligibleWinners.length == 1) {
-        final winner = eligibleWinners.first;
-        awards[winner] = (awards[winner] ?? 0) + pot.amount;
-        distribution = '${winner.name} +${_fmt(pot.amount)}';
-      } else {
-        // Split (chop)
-        final share = pot.amount ~/ eligibleWinners.length;
-        final remainder = pot.amount - share * eligibleWinners.length;
-        for (int j = 0; j < eligibleWinners.length; j++) {
-          final extra = j < remainder ? 1 : 0;
-          final w = eligibleWinners[j];
-          awards[w] = (awards[w] ?? 0) + share + extra;
-        }
-        distribution = eligibleWinners
-            .map((w) => '${w.name} +${_fmt(share)}')
-            .join(' / ');
-        if (remainder > 0) {
-          distribution += ' (+$remainder odd chip)';
-        }
-      }
-
-      rows.add(_potRow(
-        label: label,
-        amount: pot.amount,
-        eligible: pot.eligible.map((p) => p.name).join(', '),
-        distribution: distribution,
-        isMain: isMain,
-      ));
-    }
-
-    final totalPot = pots.fold<int>(0, (s, p) => s + p.amount);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        ...rows.map((r) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: r,
-            )),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0E2E0E),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.green.shade600),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.account_balance,
-                      color: Colors.green.shade300, size: 18),
-                  const SizedBox(width: 8),
-                  Text(
-                    'TOTAL POT',
-                    style: GoogleFonts.orbitron(
-                      color: Colors.green.shade300,
-                      fontSize: 12,
-                      letterSpacing: 2,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    _fmt(totalPot),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontFamily: 'monospace',
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              ...awards.entries.map((e) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 3),
-                    child: Row(
-                      children: [
-                        Icon(Icons.emoji_events,
-                            color: Colors.amber.shade300, size: 16),
-                        const SizedBox(width: 8),
-                        Text(
-                          e.key.name,
-                          style: GoogleFonts.rajdhani(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          '+${_fmt(e.value)}',
-                          style: TextStyle(
-                            color: Colors.amber.shade300,
-                            fontSize: 18,
-                            fontFamily: 'monospace',
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )),
-            ],
-          ),
-        ),
-      ],
-    );
+String _fmt(int n) {
+  final s = n.toString();
+  final buf = StringBuffer();
+  for (int i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+    buf.write(s[i]);
   }
-
-  Widget _potRow({
-    required String label,
-    required int amount,
-    required String eligible,
-    required String distribution,
-    required bool isMain,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isMain
-              ? Colors.amber.withValues(alpha: 0.3)
-              : Colors.white.withValues(alpha: 0.08),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                label,
-                style: GoogleFonts.orbitron(
-                  color: isMain ? Colors.amber.shade300 : Colors.white60,
-                  fontSize: 11,
-                  letterSpacing: 1.4,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                _fmt(amount),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontFamily: 'monospace',
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'eligible: $eligible',
-            style: const TextStyle(color: Colors.white38, fontSize: 11),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            '→ $distribution',
-            style: TextStyle(
-              color: Colors.green.shade300,
-              fontSize: 13,
-              fontFamily: 'monospace',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _fmt(int n) {
-    final s = n.toString();
-    final buf = StringBuffer();
-    for (int i = 0; i < s.length; i++) {
-      if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
-      buf.write(s[i]);
-    }
-    return buf.toString();
-  }
+  return buf.toString();
 }
