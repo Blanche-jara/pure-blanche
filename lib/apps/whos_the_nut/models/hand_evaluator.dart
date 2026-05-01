@@ -166,3 +166,17 @@ HandRank findNutRank(List<PlayingCard> community) {
   }
   return best!;
 }
+
+/// Evaluate a hole-card pair given the community.
+/// If [flopOnly] is true, only the first 3 community cards are used,
+/// and the result is exactly the 5-card hand.
+HandRank evaluateWithBoard(
+  List<PlayingCard> hole,
+  List<PlayingCard> community, {
+  bool flopOnly = false,
+}) {
+  if (flopOnly) {
+    return evaluateFive([...hole, ...community.take(3)]);
+  }
+  return bestOfSeven([...hole, ...community]);
+}

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/playing_card.dart';
 import '../models/hand_evaluator.dart';
+import '../models/restriction.dart';
 import '../widgets/poker_card.dart';
 
 class NutHandScreen extends StatefulWidget {
@@ -37,6 +38,20 @@ class _NutHandScreenState extends State<NutHandScreen> {
   /// Hard result.
   _HardResult? _hardResult;
 
+  // ── EXTRA HARD MODE state ──
+  /// Consecutive perfect submissions in hard mode.
+  int _streak = 0;
+  static const _streakUnlock = 5;
+
+  /// Once unlocked, the EXTRA HARD button is visible for the whole session.
+  bool _extraHardUnlocked = false;
+
+  /// Whether EXTRA HARD is currently active (toggleable after unlock).
+  bool _extraHardActive = false;
+
+  /// Active restrictions for the current hand (empty in normal hard mode).
+  List<Restriction> _activeRestrictions = const [];
+
   bool get _hard => widget.hardMode;
   int get _slotCount => _hard ? 3 : 1;
 
@@ -47,29 +62,56 @@ class _NutHandScreenState extends State<NutHandScreen> {
   }
 
   void _newHand() {
-    final deck = [...kAllCards]..shuffle(_rng);
-    final community = deck.take(5).toList();
-    final topNuts = _hard ? _computeTopNutRanks(community) : null;
+    // Try generating a scenario; if EXTRA HARD restrictions yield <3 distinct
+    // nut ranks (or zero feasible holes), retry up to a few times with new
+    // restrictions / community.
+    List<PlayingCard> community = [];
+    List<HandRank> topNuts = const [];
+    List<Restriction> restrictions = const [];
+
+    for (int attempt = 0; attempt < 20; attempt++) {
+      final deck = [...kAllCards]..shuffle(_rng);
+      community = deck.take(5).toList();
+      restrictions =
+          _extraHardActive ? pickRandomRestrictions(_rng, maxCount: 3) : const [];
+      if (!_hard) {
+        topNuts = const [];
+        break;
+      }
+      topNuts = _computeTopNutRanks(community, restrictions);
+      if (topNuts.length >= 3) break;
+    }
+
     setState(() {
       _community = community;
+      _activeRestrictions = restrictions;
       _slots = List.generate(_slotCount, (_) => <PlayingCard>[]);
       _activeRow = 0;
-      _topNutRanks = topNuts;
+      _topNutRanks = _hard ? topNuts : null;
       _result = null;
       _hardResult = null;
     });
   }
 
-  /// Returns the top 3 distinct HandRanks achievable with any hole-card pair.
-  List<HandRank> _computeTopNutRanks(List<PlayingCard> community) {
+  /// Returns the top 3 distinct HandRanks achievable with any hole-card pair,
+  /// filtered by the given restrictions.
+  List<HandRank> _computeTopNutRanks(
+    List<PlayingCard> community,
+    List<Restriction> restrictions,
+  ) {
+    final flopOnly = restrictions.any((r) => r.flopOnly);
     final available =
         kAllCards.where((c) => !community.contains(c)).toList();
     final allRanks = <HandRank>{};
     for (int i = 0; i < available.length; i++) {
       for (int j = i + 1; j < available.length; j++) {
-        allRanks.add(
-          bestOfSeven([available[i], available[j], ...community]),
-        );
+        final hole = [available[i], available[j]];
+        // Hole-card filter
+        if (!restrictions.every((r) => r.allowsHole(hole))) continue;
+        final rank = evaluateWithBoard(hole, community, flopOnly: flopOnly);
+        // Made-hand filter
+        if (!restrictions.every((r) => r.allowsHand(rank))) continue;
+        allRanks.add(rank);
       }
     }
     final sorted = allRanks.toList()..sort((a, b) => b.compareTo(a));
@@ -123,18 +165,44 @@ class _NutHandScreenState extends State<NutHandScreen> {
     if (!_allSlotsFull) return;
 
     if (_hard) {
+      final flopOnly = _activeRestrictions.any((r) => r.flopOnly);
       final results = <bool>[];
       final userRanks = <HandRank>[];
+      final violations = <bool>[]; // true = restriction violated
       for (int i = 0; i < 3; i++) {
-        final r = bestOfSeven([..._slots[i], ..._community]);
+        final hole = _slots[i];
+        // Check restrictions on the hole itself
+        final holeOK =
+            _activeRestrictions.every((r) => r.allowsHole(hole));
+        final r =
+            evaluateWithBoard(hole, _community, flopOnly: flopOnly);
+        final handOK =
+            _activeRestrictions.every((rr) => rr.allowsHand(r));
         userRanks.add(r);
-        results.add(_topNutRanks != null && r == _topNutRanks![i]);
+        violations.add(!holeOK || !handOK);
+        results.add(holeOK &&
+            handOK &&
+            _topNutRanks != null &&
+            r == _topNutRanks![i]);
       }
+      final allCorrect = results.every((v) => v);
+
       setState(() {
+        // Streak tracking — only counts when not in EXTRA HARD,
+        // since restrictions make scenarios easier-to-fail.
+        if (!_extraHardActive) {
+          if (allCorrect) {
+            _streak++;
+            if (_streak >= _streakUnlock) _extraHardUnlocked = true;
+          } else {
+            _streak = 0;
+          }
+        }
         _hardResult = _HardResult(
           userRanks: userRanks,
           topRanks: _topNutRanks!,
           perRow: results,
+          violations: violations,
         );
       });
     } else {
@@ -157,17 +225,51 @@ class _NutHandScreenState extends State<NutHandScreen> {
     final isNarrow = size.width < 720;
     final cardW = isNarrow ? 36.0 : 44.0;
     final heroW = isNarrow ? 52.0 : 64.0;
-    final accent = _hard ? Colors.red.shade300 : Colors.amber.shade300;
-    final feltBg =
-        _hard ? const Color(0xFF2E0E0E) : const Color(0xFF0E2E0E);
-    final feltBorder =
-        _hard ? Colors.red.shade900 : Colors.green.shade900;
+    final accent =
+        _extraHardActive ? Colors.red.shade300 : Colors.amber.shade300;
+    final feltBg = _extraHardActive
+        ? const Color(0xFF2E0E0E)
+        : const Color(0xFF0E2E0E);
+    final feltBorder = _extraHardActive
+        ? Colors.red.shade900
+        : Colors.green.shade900;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Hard-mode HUD (streak + EXTRA HARD unlock/toggle)
+          if (_hard) ...[
+            _StreakHud(
+              streak: _streak,
+              max: _streakUnlock,
+              unlocked: _extraHardUnlocked,
+              extraActive: _extraHardActive,
+              onToggleExtra: _extraHardUnlocked
+                  ? () {
+                      setState(() => _extraHardActive = !_extraHardActive);
+                      _newHand();
+                    }
+                  : null,
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // Active restrictions chips (EXTRA HARD only)
+          if (_extraHardActive && _activeRestrictions.isNotEmpty) ...[
+            _sectionLabel('SPECIAL RESTRICTIONS', accent),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _activeRestrictions
+                  .map((r) => _RestrictionChip(label: r.label))
+                  .toList(),
+            ),
+            const SizedBox(height: 24),
+          ],
+
           _sectionLabel('COMMUNITY', accent),
           const SizedBox(height: 12),
           _felt(
@@ -629,10 +731,12 @@ class _HardResult {
   final List<HandRank> userRanks;
   final List<HandRank> topRanks;
   final List<bool> perRow;
+  final List<bool> violations; // true = pair violates a restriction
   const _HardResult({
     required this.userRanks,
     required this.topRanks,
     required this.perRow,
+    this.violations = const [false, false, false],
   });
 
   bool get allCorrect => perRow.every((v) => v);
@@ -767,5 +871,193 @@ String _placeLabel(int placeIndex) {
       return '3RD NUT';
     default:
       return '${placeIndex + 1}TH';
+  }
+}
+
+// ───────────────────────── Streak HUD ─────────────────────────
+
+class _StreakHud extends StatelessWidget {
+  final int streak;
+  final int max;
+  final bool unlocked;
+  final bool extraActive;
+  final VoidCallback? onToggleExtra;
+
+  const _StreakHud({
+    required this.streak,
+    required this.max,
+    required this.unlocked,
+    required this.extraActive,
+    required this.onToggleExtra,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cappedStreak = streak.clamp(0, max);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: extraActive
+            ? Colors.red.shade900.withValues(alpha: 0.25)
+            : Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: extraActive ? Colors.red.shade400 : Colors.white12,
+          width: extraActive ? 1.5 : 1,
+        ),
+        boxShadow: extraActive
+            ? [
+                BoxShadow(
+                  color: Colors.red.withValues(alpha: 0.4),
+                  blurRadius: 12,
+                ),
+              ]
+            : null,
+      ),
+      child: Row(
+        children: [
+          // Streak flames
+          if (!extraActive) ...[
+            Text(
+              'STREAK',
+              style: GoogleFonts.orbitron(
+                color: Colors.amber.shade300,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.4,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Row(
+              children: List.generate(max, (i) {
+                final lit = i < cappedStreak;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 2),
+                  child: Icon(
+                    lit
+                        ? Icons.local_fire_department
+                        : Icons.local_fire_department_outlined,
+                    size: 16,
+                    color: lit ? Colors.amber.shade300 : Colors.white24,
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '$cappedStreak / $max',
+              style: GoogleFonts.rajdhani(
+                color: Colors.white70,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ] else ...[
+            Icon(Icons.warning_amber_rounded,
+                color: Colors.red.shade300, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              'EXTRA HARD ACTIVE',
+              style: GoogleFonts.orbitron(
+                color: Colors.red.shade300,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.6,
+              ),
+            ),
+          ],
+          const Spacer(),
+          // EXTRA HARD button (visible after unlock)
+          if (unlocked) _ExtraHardBtn(active: extraActive, onTap: onToggleExtra),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExtraHardBtn extends StatefulWidget {
+  final bool active;
+  final VoidCallback? onTap;
+  const _ExtraHardBtn({required this.active, required this.onTap});
+
+  @override
+  State<_ExtraHardBtn> createState() => _ExtraHardBtnState();
+}
+
+class _ExtraHardBtnState extends State<_ExtraHardBtn> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final on = widget.active;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: on
+                ? Colors.red.shade700
+                : (_hovered
+                    ? Colors.red.shade900.withValues(alpha: 0.4)
+                    : Colors.transparent),
+            border: Border.all(color: Colors.red.shade400, width: 1.5),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.whatshot,
+                size: 14,
+                color: on ? Colors.white : Colors.red.shade300,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                on ? 'EXIT EXTRA' : 'EXTRA HARD',
+                style: GoogleFonts.orbitron(
+                  color: on ? Colors.white : Colors.red.shade300,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.6,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ───────────────────────── Restriction chip ─────────────────────────
+
+class _RestrictionChip extends StatelessWidget {
+  final String label;
+  const _RestrictionChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.red.shade900.withValues(alpha: 0.3),
+        border: Border.all(color: Colors.red.shade400),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.orbitron(
+          color: Colors.red.shade200,
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
   }
 }
