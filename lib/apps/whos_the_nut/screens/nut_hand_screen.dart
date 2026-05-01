@@ -6,7 +6,8 @@ import '../models/hand_evaluator.dart';
 import '../widgets/poker_card.dart';
 
 class NutHandScreen extends StatefulWidget {
-  const NutHandScreen({super.key});
+  final bool hardMode;
+  const NutHandScreen({super.key, this.hardMode = false});
 
   @override
   State<NutHandScreen> createState() => _NutHandScreenState();
@@ -18,10 +19,26 @@ class _NutHandScreenState extends State<NutHandScreen> {
   /// 5 community cards
   late List<PlayingCard> _community;
 
-  /// Up to 2 selected hole cards
-  final List<PlayingCard> _selected = [];
+  /// Easy mode: up to 2 cards.
+  /// Hard mode: 3 rows × up to 2 cards each (1st, 2nd, 3rd nut).
+  /// Each row is independent — the same card can appear in multiple rows
+  /// (each represents a separate hypothetical hand).
+  late List<List<PlayingCard>> _slots;
 
+  /// Index of the row receiving new card additions.
+  int _activeRow = 0;
+
+  /// Hard mode only — top 3 distinct hand ranks possible.
+  List<HandRank>? _topNutRanks;
+
+  /// Easy result.
   _Result? _result;
+
+  /// Hard result.
+  _HardResult? _hardResult;
+
+  bool get _hard => widget.hardMode;
+  int get _slotCount => _hard ? 3 : 1;
 
   @override
   void initState() {
@@ -31,37 +48,107 @@ class _NutHandScreenState extends State<NutHandScreen> {
 
   void _newHand() {
     final deck = [...kAllCards]..shuffle(_rng);
+    final community = deck.take(5).toList();
+    final topNuts = _hard ? _computeTopNutRanks(community) : null;
     setState(() {
-      _community = deck.take(5).toList();
-      _selected.clear();
+      _community = community;
+      _slots = List.generate(_slotCount, (_) => <PlayingCard>[]);
+      _activeRow = 0;
+      _topNutRanks = topNuts;
       _result = null;
+      _hardResult = null;
     });
   }
 
+  /// Returns the top 3 distinct HandRanks achievable with any hole-card pair.
+  List<HandRank> _computeTopNutRanks(List<PlayingCard> community) {
+    final available =
+        kAllCards.where((c) => !community.contains(c)).toList();
+    final allRanks = <HandRank>{};
+    for (int i = 0; i < available.length; i++) {
+      for (int j = i + 1; j < available.length; j++) {
+        allRanks.add(
+          bestOfSeven([available[i], available[j], ...community]),
+        );
+      }
+    }
+    final sorted = allRanks.toList()..sort((a, b) => b.compareTo(a));
+    return sorted.take(3).toList();
+  }
+
+  /// Tap a card in the deck. Toggles within the ACTIVE row only.
+  /// Each row is independent — same card can be in multiple rows.
   void _toggle(PlayingCard card) {
     if (_community.contains(card)) return;
-    if (_result != null) return;
+    if (_result != null || _hardResult != null) return;
+
     setState(() {
-      if (_selected.contains(card)) {
-        _selected.remove(card);
-      } else if (_selected.length < 2) {
-        _selected.add(card);
+      final activeSlot = _slots[_activeRow];
+      if (activeSlot.contains(card)) {
+        activeSlot.remove(card);
+      } else if (activeSlot.length < 2) {
+        activeSlot.add(card);
+        // Auto-advance to next non-full row (forward only)
+        if (activeSlot.length == 2) {
+          for (int r = _activeRow + 1; r < _slots.length; r++) {
+            if (_slots[r].length < 2) {
+              _activeRow = r;
+              break;
+            }
+          }
+        }
       }
     });
   }
 
-  void _submit() {
-    if (_selected.length != 2) return;
-    final userRank = bestOfSeven([..._selected, ..._community]);
-    final nutRank = findNutRank(_community);
-    final isNut = userRank.compareTo(nutRank) == 0;
+  void _setActiveRow(int row) {
+    setState(() => _activeRow = row);
+  }
+
+  void _removeFromRow(int row, PlayingCard card) {
+    if (_result != null || _hardResult != null) return;
     setState(() {
-      _result = _Result(
-        userRank: userRank,
-        nutRank: nutRank,
-        isNut: isNut,
-      );
+      _slots[row].remove(card);
+      _activeRow = row;
     });
+  }
+
+  bool get _allSlotsFull =>
+      _slots.every((s) => s.length == 2);
+
+  int get _filledCount =>
+      _slots.fold(0, (n, s) => n + s.length);
+
+  void _submit() {
+    if (!_allSlotsFull) return;
+
+    if (_hard) {
+      final results = <bool>[];
+      final userRanks = <HandRank>[];
+      for (int i = 0; i < 3; i++) {
+        final r = bestOfSeven([..._slots[i], ..._community]);
+        userRanks.add(r);
+        results.add(_topNutRanks != null && r == _topNutRanks![i]);
+      }
+      setState(() {
+        _hardResult = _HardResult(
+          userRanks: userRanks,
+          topRanks: _topNutRanks!,
+          perRow: results,
+        );
+      });
+    } else {
+      final userRank = bestOfSeven([..._slots[0], ..._community]);
+      final nutRank = findNutRank(_community);
+      final isNut = userRank.compareTo(nutRank) == 0;
+      setState(() {
+        _result = _Result(
+          userRank: userRank,
+          nutRank: nutRank,
+          isNut: isNut,
+        );
+      });
+    }
   }
 
   @override
@@ -70,15 +157,22 @@ class _NutHandScreenState extends State<NutHandScreen> {
     final isNarrow = size.width < 720;
     final cardW = isNarrow ? 36.0 : 44.0;
     final heroW = isNarrow ? 52.0 : 64.0;
+    final accent = _hard ? Colors.red.shade300 : Colors.amber.shade300;
+    final feltBg =
+        _hard ? const Color(0xFF2E0E0E) : const Color(0xFF0E2E0E);
+    final feltBorder =
+        _hard ? Colors.red.shade900 : Colors.green.shade900;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionLabel('COMMUNITY'),
+          _sectionLabel('COMMUNITY', accent),
           const SizedBox(height: 12),
           _felt(
+            bg: feltBg,
+            border: feltBorder,
             child: Wrap(
               alignment: WrapAlignment.center,
               spacing: 8,
@@ -90,41 +184,44 @@ class _NutHandScreenState extends State<NutHandScreen> {
           ),
           const SizedBox(height: 28),
 
-          _sectionLabel('YOUR HAND'),
+          _sectionLabel(_hard ? 'TOP 3 NUT HANDS' : 'YOUR HAND', accent),
           const SizedBox(height: 4),
           Text(
-            'Pick 2 cards to make the nuts',
-            style: TextStyle(
+            _hard
+                ? 'Pick 1st, 2nd, 3rd nut hands (2 cards each, total 6)'
+                : 'Pick 2 cards to make the nuts',
+            style: const TextStyle(
               color: Colors.white38,
               fontSize: 13,
               fontStyle: FontStyle.italic,
             ),
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              for (int i = 0; i < 2; i++) ...[
-                if (i < _selected.length)
-                  PokerCardView(
-                    card: _selected[i],
-                    width: heroW,
-                    selected: true,
-                    onTap: () => _toggle(_selected[i]),
-                  )
-                else
-                  EmptyCardSlot(width: heroW),
-                const SizedBox(width: 10),
-              ],
-            ],
-          ),
+
+          // Slot rows
+          for (int row = 0; row < _slotCount; row++) ...[
+            _SlotRow(
+              label: _hard ? _placeLabel(row) : null,
+              cards: _slots[row],
+              cardWidth: heroW,
+              isActive: _hard && row == _activeRow,
+              showActiveStyle: _hard,
+              onActivate: _hard ? () => _setActiveRow(row) : null,
+              onRemove: (c) => _removeFromRow(row, c),
+              graded: _hardResult?.perRow[row],
+            ),
+            if (row < _slotCount - 1) const SizedBox(height: 10),
+          ],
+
           const SizedBox(height: 28),
 
-          _sectionLabel('SELECT FROM DECK'),
+          _sectionLabel('SELECT FROM DECK', accent),
           const SizedBox(height: 12),
           _DeckGrid(
             cardWidth: cardW,
             community: _community,
-            selected: _selected,
+            // Only the ACTIVE row's selections are highlighted in the deck.
+            selected: _slots[_activeRow].toSet(),
             onTap: _toggle,
           ),
 
@@ -145,32 +242,40 @@ class _NutHandScreenState extends State<NutHandScreen> {
               Expanded(
                 flex: 2,
                 child: _ActionBtn(
-                  label: _selected.length == 2
+                  label: _allSlotsFull
                       ? 'SUBMIT'
-                      : 'PICK ${2 - _selected.length} MORE',
+                      : 'PICK ${_slotCount * 2 - _filledCount} MORE',
                   icon: Icons.check,
                   primary: true,
-                  onTap: _selected.length == 2 && _result == null ? _submit : null,
+                  onTap: _allSlotsFull &&
+                          _result == null &&
+                          _hardResult == null
+                      ? _submit
+                      : null,
                 ),
               ),
             ],
           ),
 
-          // Result panel
+          // Result panels
           if (_result != null) ...[
             const SizedBox(height: 24),
             _ResultPanel(result: _result!),
+          ],
+          if (_hardResult != null) ...[
+            const SizedBox(height: 24),
+            _HardResultPanel(result: _hardResult!),
           ],
         ],
       ),
     );
   }
 
-  Widget _sectionLabel(String text) {
+  Widget _sectionLabel(String text, Color accent) {
     return Text(
       text,
       style: GoogleFonts.orbitron(
-        color: Colors.amber.shade300,
+        color: accent,
         fontSize: 13,
         fontWeight: FontWeight.w700,
         letterSpacing: 3,
@@ -178,16 +283,117 @@ class _NutHandScreenState extends State<NutHandScreen> {
     );
   }
 
-  Widget _felt({required Widget child}) {
+  Widget _felt({required Widget child, required Color bg, required Color border}) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF0E2E0E),
+        color: bg,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.green.shade900),
+        border: Border.all(color: border),
       ),
       child: child,
     );
+  }
+}
+
+// ───────────────────────── Slot row ─────────────────────────
+
+class _SlotRow extends StatelessWidget {
+  final String? label;
+  final List<PlayingCard> cards;
+  final double cardWidth;
+  final bool isActive;
+  final bool showActiveStyle;
+  final VoidCallback? onActivate;
+  final ValueChanged<PlayingCard> onRemove;
+  final bool? graded;
+
+  const _SlotRow({
+    required this.label,
+    required this.cards,
+    required this.cardWidth,
+    required this.isActive,
+    required this.showActiveStyle,
+    required this.onActivate,
+    required this.onRemove,
+    required this.graded,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Color resultColor = Colors.transparent;
+    IconData? resultIcon;
+    if (graded != null) {
+      resultColor = graded! ? Colors.green.shade400 : Colors.red.shade400;
+      resultIcon = graded! ? Icons.check_circle_outline : Icons.cancel_outlined;
+    }
+
+    final labelColor = graded != null
+        ? resultColor
+        : (isActive ? Colors.amber.shade300 : Colors.white38);
+
+    Widget rowChild = Row(
+      children: [
+        if (label != null) ...[
+          SizedBox(
+            width: 64,
+            child: Text(
+              label!,
+              style: GoogleFonts.orbitron(
+                color: labelColor,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.4,
+              ),
+            ),
+          ),
+        ],
+        for (int i = 0; i < 2; i++) ...[
+          if (i < cards.length)
+            PokerCardView(
+              card: cards[i],
+              width: cardWidth,
+              selected: true,
+              onTap: graded == null ? () => onRemove(cards[i]) : null,
+            )
+          else
+            EmptyCardSlot(width: cardWidth),
+          const SizedBox(width: 10),
+        ],
+        if (resultIcon != null) Icon(resultIcon, color: resultColor, size: 24),
+      ],
+    );
+
+    if (showActiveStyle) {
+      rowChild = AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+        decoration: BoxDecoration(
+          color: isActive
+              ? Colors.amber.withValues(alpha: 0.06)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isActive ? Colors.amber.shade300 : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: rowChild,
+      );
+    }
+
+    if (onActivate != null) {
+      rowChild = MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onActivate,
+          child: rowChild,
+        ),
+      );
+    }
+
+    return rowChild;
   }
 }
 
@@ -196,7 +402,7 @@ class _NutHandScreenState extends State<NutHandScreen> {
 class _DeckGrid extends StatelessWidget {
   final double cardWidth;
   final List<PlayingCard> community;
-  final List<PlayingCard> selected;
+  final Set<PlayingCard> selected;
   final ValueChanged<PlayingCard> onTap;
 
   const _DeckGrid({
@@ -325,7 +531,7 @@ class _ActionBtnState extends State<_ActionBtn> {
   }
 }
 
-// ───────────────────────── Result panel ─────────────────────────
+// ───────────────────────── Easy result ─────────────────────────
 
 class _Result {
   final HandRank userRank;
@@ -377,13 +583,9 @@ class _ResultPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          _resultRow(
-            'YOUR HAND',
-            result.userRank.category.label,
-            Colors.white,
-          ),
+          _row('YOUR HAND', result.userRank.category.label, Colors.white),
           const SizedBox(height: 6),
-          _resultRow(
+          _row(
             'BEST POSSIBLE',
             result.nutRank.category.label,
             Colors.amber.shade300,
@@ -393,14 +595,14 @@ class _ResultPanel extends StatelessWidget {
     );
   }
 
-  Widget _resultRow(String label, String value, Color valueColor) {
+  Widget _row(String label, String value, Color valueColor) {
     return Row(
       children: [
         SizedBox(
           width: 130,
           child: Text(
             label,
-            style: TextStyle(
+            style: const TextStyle(
               color: Colors.white38,
               fontSize: 11,
               letterSpacing: 1.4,
@@ -418,5 +620,152 @@ class _ResultPanel extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+// ───────────────────────── Hard result ─────────────────────────
+
+class _HardResult {
+  final List<HandRank> userRanks;
+  final List<HandRank> topRanks;
+  final List<bool> perRow;
+  const _HardResult({
+    required this.userRanks,
+    required this.topRanks,
+    required this.perRow,
+  });
+
+  bool get allCorrect => perRow.every((v) => v);
+  int get score => perRow.where((v) => v).length;
+}
+
+class _HardResultPanel extends StatelessWidget {
+  final _HardResult result;
+  const _HardResultPanel({required this.result});
+
+  @override
+  Widget build(BuildContext context) {
+    final color =
+        result.allCorrect ? Colors.green.shade400 : Colors.red.shade400;
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.5), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                result.allCorrect
+                    ? Icons.check_circle_outline
+                    : Icons.cancel_outlined,
+                color: color,
+                size: 28,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                result.allCorrect ? 'PERFECT!' : 'INCORRECT',
+                style: GoogleFonts.orbitron(
+                  color: color,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${result.score} / 3',
+                style: GoogleFonts.rajdhani(
+                  color: color,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          for (int i = 0; i < 3; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _hardRow(
+                place: i,
+                userRank: result.userRanks[i],
+                topRank: result.topRanks[i],
+                correct: result.perRow[i],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _hardRow({
+    required int place,
+    required HandRank userRank,
+    required HandRank topRank,
+    required bool correct,
+  }) {
+    final c = correct ? Colors.green.shade400 : Colors.red.shade400;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 60,
+          child: Text(
+            _placeLabel(place),
+            style: GoogleFonts.orbitron(
+              color: c,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.4,
+            ),
+          ),
+        ),
+        Icon(
+          correct ? Icons.check : Icons.close,
+          color: c,
+          size: 18,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'YOU: ${userRank.category.label}',
+                style: TextStyle(color: Colors.white, fontSize: 14),
+              ),
+              if (!correct)
+                Text(
+                  'CORRECT: ${topRank.category.label}',
+                  style: TextStyle(
+                    color: Colors.amber.shade300,
+                    fontSize: 13,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ───────────────────────── Helpers ─────────────────────────
+
+String _placeLabel(int placeIndex) {
+  switch (placeIndex) {
+    case 0:
+      return '1ST NUT';
+    case 1:
+      return '2ND NUT';
+    case 2:
+      return '3RD NUT';
+    default:
+      return '${placeIndex + 1}TH';
   }
 }

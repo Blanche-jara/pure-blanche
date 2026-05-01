@@ -4,7 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class SidePotScreen extends StatefulWidget {
-  const SidePotScreen({super.key});
+  final bool hardMode;
+  const SidePotScreen({super.key, this.hardMode = false});
 
   @override
   State<SidePotScreen> createState() => _SidePotScreenState();
@@ -20,7 +21,7 @@ class _SidePotScreenState extends State<SidePotScreen> {
   /// null = not yet submitted
   _GradeResult? _grade;
 
-  bool _hardMode = false;
+  bool get _hardMode => widget.hardMode;
 
   // Theme-derived colors based on hard mode
   Color get _accent =>
@@ -197,19 +198,7 @@ class _SidePotScreenState extends State<SidePotScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top row: SCENARIO label + HARD MODE toggle
-          Row(
-            children: [
-              _label('SCENARIO'),
-              const Spacer(),
-              _HardModeToggle(
-                value: _hardMode,
-                onChanged: (v) => setState(() {
-                  _hardMode = v;
-                }),
-              ),
-            ],
-          ),
+          _label('SCENARIO'),
           const SizedBox(height: 8),
           Text(
             '각 플레이어가 얻는 칩 수를 입력하세요 (단위: 칩)',
@@ -349,83 +338,6 @@ class _SidePotScreenState extends State<SidePotScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ───────────────────────── Hard mode toggle ─────────────────────────
-
-class _HardModeToggle extends StatefulWidget {
-  final bool value;
-  final ValueChanged<bool> onChanged;
-  const _HardModeToggle({required this.value, required this.onChanged});
-
-  @override
-  State<_HardModeToggle> createState() => _HardModeToggleState();
-}
-
-class _HardModeToggleState extends State<_HardModeToggle> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final on = widget.value;
-    final color = on ? Colors.red.shade300 : Colors.white38;
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: () => widget.onChanged(!on),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          decoration: BoxDecoration(
-            color: on
-                ? Colors.red.shade900.withValues(alpha: 0.35)
-                : (_hovered
-                    ? Colors.white.withValues(alpha: 0.04)
-                    : Colors.transparent),
-            border: Border.all(
-              color: on
-                  ? Colors.red.shade400
-                  : (_hovered ? Colors.white24 : Colors.white12),
-              width: on ? 1.5 : 1,
-            ),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: on
-                ? [
-                    BoxShadow(
-                      color: Colors.red.withValues(alpha: 0.4),
-                      blurRadius: 10,
-                    ),
-                  ]
-                : null,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                on
-                    ? Icons.local_fire_department
-                    : Icons.local_fire_department_outlined,
-                color: color,
-                size: 16,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                'HARD MODE',
-                style: GoogleFonts.orbitron(
-                  color: color,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.8,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
