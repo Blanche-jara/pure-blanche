@@ -133,6 +133,7 @@ const _projects = [
     icon: Icons.psychology_outlined,
     type: 'flutter',
     route: '/app/whos-the-nut',
+    downloadUrl: 'https://drive.google.com/file/d/1SliqndoB7B_Uoyxa52ZeaueQx3krhbeW/view?usp=sharing',
   ),
   _ProjectData(
     title: '자마카세 인원뽑기',
