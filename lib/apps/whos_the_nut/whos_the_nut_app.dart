@@ -18,9 +18,90 @@ class WhosTheNutApp extends StatefulWidget {
 class _WhosTheNutAppState extends State<WhosTheNutApp> {
   int _mode = 0; // 0 = Nut Hand, 1 = Side Pot
   bool _hardMode = false;
+  bool _extraHardUnlocked = false;
+  bool _extraHardActive = false;
 
-  void _setHard(bool v) {
-    setState(() => _hardMode = v);
+  Future<void> _setHard(bool v) async {
+    // Confirm before turning HARD off while EXTRA HARD is active.
+    if (!v && _extraHardActive) {
+      final confirmed = await _confirmExitExtraHard();
+      if (confirmed != true) return;
+    }
+    setState(() {
+      _hardMode = v;
+      if (!v) {
+        _extraHardActive = false;
+        _extraHardUnlocked = false;
+      }
+    });
+  }
+
+  Future<bool?> _confirmExitExtraHard() {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A0A0A),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: Colors.red.shade700, width: 1.5),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded,
+                color: Colors.red.shade300, size: 22),
+            const SizedBox(width: 10),
+            Text(
+              'EXIT EXTRA HARD?',
+              style: GoogleFonts.orbitron(
+                color: Colors.red.shade300,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.6,
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'EXTRA HARD MODE가 활성화되어 있습니다.\n그래도 HARD MODE를 종료하시겠습니까?',
+          style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.6),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'CANCEL',
+              style: GoogleFonts.orbitron(
+                color: Colors.white54,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.4,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              'EXIT',
+              style: GoogleFonts.orbitron(
+                color: Colors.red.shade300,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _setUnlocked() {
+    setState(() => _extraHardUnlocked = true);
+  }
+
+  void _setExtraActive(bool v) {
+    setState(() {
+      _extraHardActive = v;
+      if (v) _extraHardUnlocked = true;
+    });
   }
 
   @override
@@ -42,6 +123,10 @@ class _WhosTheNutAppState extends State<WhosTheNutApp> {
                     ? NutHandScreen(
                         key: ValueKey('nut_$_hardMode'),
                         hardMode: _hardMode,
+                        extraHardUnlocked: _extraHardUnlocked,
+                        extraHardActive: _extraHardActive,
+                        onUnlock: _setUnlocked,
+                        onSetExtraActive: _setExtraActive,
                       )
                     : SidePotScreen(
                         key: ValueKey('pot_$_hardMode'),

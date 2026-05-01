@@ -8,7 +8,18 @@ import '../widgets/poker_card.dart';
 
 class NutHandScreen extends StatefulWidget {
   final bool hardMode;
-  const NutHandScreen({super.key, this.hardMode = false});
+  final bool extraHardUnlocked;
+  final bool extraHardActive;
+  final VoidCallback onUnlock;
+  final ValueChanged<bool> onSetExtraActive;
+  const NutHandScreen({
+    super.key,
+    this.hardMode = false,
+    this.extraHardUnlocked = false,
+    this.extraHardActive = false,
+    required this.onUnlock,
+    required this.onSetExtraActive,
+  });
 
   @override
   State<NutHandScreen> createState() => _NutHandScreenState();
@@ -43,22 +54,27 @@ class _NutHandScreenState extends State<NutHandScreen> {
   int _streak = 0;
   static const _streakUnlock = 5;
 
-  /// Once unlocked, the EXTRA HARD button is visible for the whole session.
-  bool _extraHardUnlocked = false;
-
-  /// Whether EXTRA HARD is currently active (toggleable after unlock).
-  bool _extraHardActive = false;
-
   /// Active restrictions for the current hand (empty in normal hard mode).
   List<Restriction> _activeRestrictions = const [];
 
   bool get _hard => widget.hardMode;
+  bool get _extraHardUnlocked => widget.extraHardUnlocked;
+  bool get _extraHardActive => widget.extraHardActive;
   int get _slotCount => _hard ? 3 : 1;
 
   @override
   void initState() {
     super.initState();
     _newHand();
+  }
+
+  @override
+  void didUpdateWidget(NutHandScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // When EXTRA HARD activation toggles, regenerate the scenario.
+    if (oldWidget.extraHardActive != widget.extraHardActive) {
+      _newHand();
+    }
   }
 
   void _newHand() {
@@ -164,6 +180,12 @@ class _NutHandScreenState extends State<NutHandScreen> {
   void _submit() {
     if (!_allSlotsFull) return;
 
+    // ── Easter egg: T♠A♠ / A♠2♠ / 2♠8♠ in HARD mode triggers EXTRA HARD ──
+    if (_hard && _isEasterEgg(_slots)) {
+      _showEasterEggDialog();
+      return;
+    }
+
     if (_hard) {
       final flopOnly = _activeRestrictions.any((r) => r.flopOnly);
       final results = <bool>[];
@@ -187,17 +209,19 @@ class _NutHandScreenState extends State<NutHandScreen> {
       }
       final allCorrect = results.every((v) => v);
 
-      setState(() {
-        // Streak tracking — only counts when not in EXTRA HARD,
-        // since restrictions make scenarios easier-to-fail.
-        if (!_extraHardActive) {
-          if (allCorrect) {
-            _streak++;
-            if (_streak >= _streakUnlock) _extraHardUnlocked = true;
-          } else {
-            _streak = 0;
+      // Streak tracking — only counts when not in EXTRA HARD.
+      bool unlockedThisRound = false;
+      if (!_extraHardActive) {
+        if (allCorrect) {
+          _streak++;
+          if (_streak >= _streakUnlock && !_extraHardUnlocked) {
+            unlockedThisRound = true;
           }
+        } else {
+          _streak = 0;
         }
+      }
+      setState(() {
         _hardResult = _HardResult(
           userRanks: userRanks,
           topRanks: _topNutRanks!,
@@ -205,6 +229,7 @@ class _NutHandScreenState extends State<NutHandScreen> {
           violations: violations,
         );
       });
+      if (unlockedThisRound) widget.onUnlock();
     } else {
       final userRank = bestOfSeven([..._slots[0], ..._community]);
       final nutRank = findNutRank(_community);
@@ -216,6 +241,85 @@ class _NutHandScreenState extends State<NutHandScreen> {
           isNut: isNut,
         );
       });
+    }
+  }
+
+  // ── Easter egg detection ──
+  /// Hard-mode submission with these exact spade combos triggers EXTRA HARD:
+  ///   row 0: T♠ A♠
+  ///   row 1: A♠ 2♠
+  ///   row 2: 2♠ 8♠
+  bool _isEasterEgg(List<List<PlayingCard>> slots) {
+    if (slots.length != 3) return false;
+    bool match(List<PlayingCard> hole, int r1, int r2) {
+      if (hole.length != 2) return false;
+      if (!hole.every((c) => c.suit == Suit.spades)) return false;
+      final ranks = hole.map((c) => c.rank).toList()..sort();
+      final wanted = [r1, r2]..sort();
+      return ranks[0] == wanted[0] && ranks[1] == wanted[1];
+    }
+    return match(slots[0], 10, 14) && // T A
+        match(slots[1], 14, 2) && //  A 2
+        match(slots[2], 2, 8); //   2 8
+  }
+
+  Future<void> _showEasterEggDialog() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A0A0A),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: Colors.red.shade700, width: 1.5),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.whatshot, color: Colors.red.shade300, size: 22),
+            const SizedBox(width: 10),
+            Text(
+              'EASTER EGG',
+              style: GoogleFonts.orbitron(
+                color: Colors.red.shade300,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2,
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          '비밀 코드 발견!\nEXTRA HARD MODE를 활성화하시겠습니까?',
+          style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.6),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'NO',
+              style: GoogleFonts.orbitron(
+                color: Colors.white54,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.4,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              'ACTIVATE',
+              style: GoogleFonts.orbitron(
+                color: Colors.red.shade300,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      widget.onUnlock();
+      widget.onSetExtraActive(true);
     }
   }
 
@@ -247,10 +351,7 @@ class _NutHandScreenState extends State<NutHandScreen> {
               unlocked: _extraHardUnlocked,
               extraActive: _extraHardActive,
               onToggleExtra: _extraHardUnlocked
-                  ? () {
-                      setState(() => _extraHardActive = !_extraHardActive);
-                      _newHand();
-                    }
+                  ? () => widget.onSetExtraActive(!_extraHardActive)
                   : null,
             ),
             const SizedBox(height: 16),
