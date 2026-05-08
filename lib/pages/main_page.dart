@@ -177,13 +177,25 @@ class _MainPageState extends State<MainPage>
               ),
             ),
 
-            // Video overlay
+            // Video overlay (tap anywhere on mobile to skip)
             if (_introActive)
               AnimatedOpacity(
                 opacity: _videoFadingOut ? 0.0 : 1.0,
                 duration: const Duration(milliseconds: 800),
-                child: const SizedBox.expand(
-                  child: HtmlElementView(viewType: _videoViewType),
+                child: Stack(
+                  children: [
+                    const SizedBox.expand(
+                      child: HtmlElementView(viewType: _videoViewType),
+                    ),
+                    // Transparent gesture layer covering the video
+                    if (isMobile)
+                      Positioned.fill(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: _finishIntro,
+                        ),
+                      ),
+                  ],
                 ),
               ),
           ],
