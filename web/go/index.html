@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>It's Safe Link — Redirecting…</title>
+<meta name="robots" content="noindex,nofollow">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    background: #050507;
+    color: #f2f2f2;
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .card {
+    max-width: 480px;
+    width: 100%;
+    text-align: center;
+    border: 1px solid #3d3a39;
+    border-radius: 12px;
+    padding: 40px 28px;
+    background: #101010;
+  }
+  .label {
+    font-size: 12px;
+    letter-spacing: 2.8px;
+    color: #00d992;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.4px;
+    margin-bottom: 12px;
+  }
+  p {
+    font-size: 14px;
+    line-height: 1.65;
+    color: #b8b3b0;
+    margin-bottom: 20px;
+    word-break: break-all;
+  }
+  .url {
+    font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 13px;
+    color: #f2f2f2;
+    padding: 10px 12px;
+    background: #050507;
+    border: 1px solid #3d3a39;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    word-break: break-all;
+    text-align: left;
+  }
+  .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  a.btn, button.btn {
+    display: inline-block;
+    padding: 10px 20px;
+    border: 1px solid #3d3a39;
+    border-radius: 6px;
+    background: #101010;
+    color: #2fd6a1;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color .15s;
+  }
+  a.btn:hover, button.btn:hover { border-color: #00d992; }
+  a.btn.muted { color: #8b949e; }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid #3d3a39;
+    border-top-color: #00d992;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 20px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .hidden { display: none !important; }
+  .danger { color: #fb565b; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
+<script src="dict.js"></script>
+</head>
+<body>
+<div class="card">
+  <!-- Loading state -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <div class="label">It's Safe Link</div>
+    <h1>Redirecting…</h1>
+    <p id="dest">Verifying destination</p>
+  </div>
+
+  <!-- Confirm state (shown briefly so user sees the destination) -->
+  <div id="confirm" class="hidden">
+    <div class="label">It's Safe Link</div>
+    <h1>You're heading to:</h1>
+    <div class="url" id="confirmUrl"></div>
+    <div class="actions">
+      <a class="btn" id="continueBtn" href="#">Continue →</a>
+      <a class="btn muted" href="/">Cancel</a>
+    </div>
+  </div>
+
+  <!-- Error state -->
+  <div id="error" class="hidden">
+    <div class="label danger">It's Safe Link</div>
+    <h1 class="danger">Invalid Link</h1>
+    <p id="errMsg">This link is malformed or unsafe.</p>
+    <div class="actions">
+      <a class="btn muted" href="/">← Back to home</a>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const loading = document.getElementById('loading');
+  const confirmEl = document.getElementById('confirm');
+  const errEl = document.getElementById('error');
+  const errMsg = document.getElementById('errMsg');
+  const dest = document.getElementById('dest');
+  const confirmUrl = document.getElementById('confirmUrl');
+  const continueBtn = document.getElementById('continueBtn');
+
+  function showError(msg) {
+    loading.classList.add('hidden');
+    confirmEl.classList.add('hidden');
+    errMsg.textContent = msg;
+    errEl.classList.remove('hidden');
+  }
+
+  function showConfirm(url) {
+    loading.classList.add('hidden');
+    confirmUrl.textContent = url;
+    continueBtn.href = url;
+    confirmEl.classList.remove('hidden');
+    // Auto-redirect after 2s if user doesn't cancel
+    setTimeout(() => {
+      // Only auto-redirect if user hasn't navigated away
+      if (!document.hidden) window.location.replace(url);
+    }, 2000);
+  }
+
+  const hash = window.location.hash.slice(1);
+  if (!hash) {
+    showError('No link payload provided.');
+    return;
+  }
+
+  // Payload may be prefixed: c~<compressed> | r~<uri-encoded> | (legacy: bare lz)
+  let decoded;
+  try {
+    if (hash.startsWith('c~')) {
+      decoded = LZString.decompressFromEncodedURIComponent(hash.slice(2));
+    } else if (hash.startsWith('r~')) {
+      decoded = decodeURIComponent(hash.slice(2));
+    } else {
+      // Legacy: assume bare lz-string
+      decoded = LZString.decompressFromEncodedURIComponent(hash);
+    }
+  } catch (e) {
+    showError('Failed to decode link.');
+    return;
+  }
+  if (!decoded) {
+    showError('Failed to decode link.');
+    return;
+  }
+
+  // Reverse dict prefix substitution (token char → full URL prefix)
+  if (window.SafeLinkDict && window.SafeLinkDict.prefixes && decoded.length > 0) {
+    var firstChar = decoded.charAt(0);
+    var firstCode = decoded.charCodeAt(0);
+    if (firstCode >= 1 && firstCode <= 31) {
+      for (var i = 0; i < window.SafeLinkDict.prefixes.length; i++) {
+        var pair = window.SafeLinkDict.prefixes[i];
+        if (pair[0] === firstChar) {
+          decoded = pair[1] + decoded.slice(1);
+          break;
+        }
+      }
+    }
+  }
+
+  // Validate URL syntax + safe scheme
+  let parsed;
+  try {
+    parsed = new URL(decoded);
+  } catch (e) {
+    showError('Decoded payload is not a valid URL.');
+    return;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    showError('Only http and https links are allowed.');
+    return;
+  }
+
+  dest.textContent = decoded;
+  showConfirm(decoded);
+})();
+</script>
+</body>
+</html>

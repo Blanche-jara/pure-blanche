@@ -186,6 +186,23 @@ const _projects = [
     type: 'web',
     route: '/app/birthday',
   ),
+  _ProjectData(
+    title: "It's Safe Link",
+    subtitle: 'safe-link',
+    description:
+        '본인 도메인을 통한 trustable redirector. lz-string으로 압축된 '
+        'URL을 hash에 담아 정적 페이지에서 디코드 → redirect.',
+    techTags: ['Flutter', 'Dart', 'lz-string', 'Static HTML'],
+    features: [
+      '백엔드/DB/커밋 0 (완전 정적)',
+      'lz-string 압축 + hash 인코딩',
+      '도착지 미리보기 후 자동 이동 (피싱 방지)',
+      'http/https 스킴만 허용',
+    ],
+    icon: Icons.link,
+    type: 'flutter',
+    route: '/app/safe-link',
+  ),
 ];
 
 // ---------------------------------------------------------------------------

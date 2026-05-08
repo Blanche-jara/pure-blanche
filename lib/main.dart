@@ -9,6 +9,7 @@ import 'apps/jara_holdem/jara_holdem_app.dart';
 import 'apps/roulette/roulette_main.dart';
 import 'apps/web_embed/html_app_page.dart';
 import 'apps/whos_the_nut/whos_the_nut_app.dart';
+import 'apps/safe_link/safe_link_app.dart';
 
 void main() {
   runApp(const PureBlancheApp());
@@ -49,6 +50,10 @@ class PureBlancheApp extends StatelessWidget {
         '/app/whos-the-nut': (_) => const AppWrapper(
               title: "Who's the Nut?",
               child: WhosTheNutApp(),
+            ),
+        '/app/safe-link': (_) => const AppWrapper(
+              title: "It's Safe Link",
+              child: SafeLinkApp(),
             ),
       },
     );
