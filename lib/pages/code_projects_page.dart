@@ -355,11 +355,14 @@ class _CodeProjectCardState extends State<_CodeProjectCard> {
               children: p.techTags.map((t) => _TechTag(label: t)).toList(),
             ),
 
-            // Privacy policy link (e.g., for Google Play Console submission)
-            if (p.privacyUrl != null) ...[
-              const SizedBox(height: 14),
-              _PrivacyLink(url: p.privacyUrl!),
-            ],
+            // Privacy policy slot (always reserved so all cards align)
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 16,
+              child: p.privacyUrl != null
+                  ? _PrivacyLink(url: p.privacyUrl!)
+                  : const SizedBox.shrink(),
+            ),
           ],
         ),
       ),
