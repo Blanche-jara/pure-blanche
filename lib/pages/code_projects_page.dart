@@ -84,6 +84,7 @@ class _ProjectData {
   final String type; // "flutter" | "web"
   final String route;
   final String? downloadUrl;
+  final String? privacyUrl;
 
   const _ProjectData({
     required this.title,
@@ -95,6 +96,7 @@ class _ProjectData {
     required this.type,
     required this.route,
     this.downloadUrl,
+    this.privacyUrl,
   });
 }
 
@@ -134,6 +136,7 @@ const _projects = [
     type: 'flutter',
     route: '/app/whos-the-nut',
     downloadUrl: 'https://drive.google.com/file/d/1SliqndoB7B_Uoyxa52ZeaueQx3krhbeW/view?usp=sharing',
+    privacyUrl: 'apps/whos-the-nut/privacy.html',
   ),
   _ProjectData(
     title: '자마카세 인원뽑기',
@@ -351,6 +354,12 @@ class _CodeProjectCardState extends State<_CodeProjectCard> {
               runSpacing: 8,
               children: p.techTags.map((t) => _TechTag(label: t)).toList(),
             ),
+
+            // Privacy policy link (e.g., for Google Play Console submission)
+            if (p.privacyUrl != null) ...[
+              const SizedBox(height: 14),
+              _PrivacyLink(url: p.privacyUrl!),
+            ],
           ],
         ),
       ),
@@ -362,6 +371,52 @@ class _CodeProjectCardState extends State<_CodeProjectCard> {
 // ---------------------------------------------------------------------------
 // Small widgets
 // ---------------------------------------------------------------------------
+
+class _PrivacyLink extends StatefulWidget {
+  final String url;
+  const _PrivacyLink({required this.url});
+
+  @override
+  State<_PrivacyLink> createState() => _PrivacyLinkState();
+}
+
+class _PrivacyLinkState extends State<_PrivacyLink> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => web.window.open(widget.url, '_blank'),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.shield_outlined,
+              size: 11,
+              color: _hovered ? AppColors.signalGreen : AppColors.steel,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'Privacy Policy',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 11,
+                color: _hovered ? AppColors.signalGreen : AppColors.steel,
+                decoration: _hovered ? TextDecoration.underline : null,
+                decorationColor: AppColors.signalGreen,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _DownloadButton extends StatefulWidget {
   final String url;
