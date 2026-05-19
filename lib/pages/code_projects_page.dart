@@ -206,6 +206,23 @@ const _projects = [
     type: 'flutter',
     route: '/app/safe-link',
   ),
+  _ProjectData(
+    title: 'THE CANNON',
+    subtitle: 'cannon',
+    description:
+        '주사위 테마 랜덤 추첨기. 상한 숫자를 정하면 6단위로 주사위 개수가 '
+        '자동 증가하고, DRAW 버튼을 누르면 주사위가 굴러가며 결과 발표.',
+    techTags: ['Flutter', 'Dart', 'Stream-friendly'],
+    features: [
+      '상한별 주사위 개수 자동 결정 (1D~)',
+      '70ms 텀블 애니메이션 (~1.7초)',
+      '거대 폰트 결과 표시 (방송 1/4 크기 대비)',
+      '커스텀 페인터 주사위 + 빠른 면 전환',
+    ],
+    icon: Icons.casino,
+    type: 'flutter',
+    route: '/app/cannon',
+  ),
 ];
 
 // ---------------------------------------------------------------------------

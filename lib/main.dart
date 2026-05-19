@@ -10,6 +10,7 @@ import 'apps/roulette/roulette_main.dart';
 import 'apps/web_embed/html_app_page.dart';
 import 'apps/whos_the_nut/whos_the_nut_app.dart';
 import 'apps/safe_link/safe_link_app.dart';
+import 'apps/cannon/cannon_app.dart';
 
 void main() {
   runApp(const PureBlancheApp());
@@ -54,6 +55,10 @@ class PureBlancheApp extends StatelessWidget {
         '/app/safe-link': (_) => const AppWrapper(
               title: "It's Safe Link",
               child: SafeLinkApp(),
+            ),
+        '/app/cannon': (_) => const AppWrapper(
+              title: 'THE CANNON',
+              child: CannonApp(),
             ),
       },
     );
