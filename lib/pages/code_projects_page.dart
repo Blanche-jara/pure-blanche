@@ -84,6 +84,7 @@ class _ProjectData {
   final String type; // "flutter" | "web"
   final String route;
   final String? downloadUrl;
+  final String downloadLabel;
   final String? privacyUrl;
 
   const _ProjectData({
@@ -96,6 +97,7 @@ class _ProjectData {
     required this.type,
     required this.route,
     this.downloadUrl,
+    this.downloadLabel = 'APK',
     this.privacyUrl,
   });
 }
@@ -222,6 +224,8 @@ const _projects = [
     icon: Icons.casino,
     type: 'flutter',
     route: '/app/cannon',
+    downloadUrl: 'https://drive.google.com/uc?export=download&id=1v_DzUDF51JRhPviEllY_UmHQzNqTP-aj',
+    downloadLabel: 'EXE',
   ),
 ];
 
@@ -286,7 +290,7 @@ class _CodeProjectCardState extends State<_CodeProjectCard> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (p.downloadUrl != null)
-                      _DownloadButton(url: p.downloadUrl!),
+                      _DownloadButton(url: p.downloadUrl!, label: p.downloadLabel),
                     if (p.downloadUrl != null) const SizedBox(width: 8),
                     _TypeBadge(type: p.type),
                   ],
@@ -440,7 +444,8 @@ class _PrivacyLinkState extends State<_PrivacyLink> {
 
 class _DownloadButton extends StatefulWidget {
   final String url;
-  const _DownloadButton({required this.url});
+  final String label;
+  const _DownloadButton({required this.url, this.label = 'APK'});
 
   @override
   State<_DownloadButton> createState() => _DownloadButtonState();
@@ -484,7 +489,7 @@ class _DownloadButtonState extends State<_DownloadButton> {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  'APK',
+                  widget.label,
                   style: TextStyle(
                     fontFamily: 'Consolas',
                     fontSize: 11,
