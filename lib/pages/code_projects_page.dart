@@ -86,6 +86,7 @@ class _ProjectData {
   final String? downloadUrl;
   final String downloadLabel;
   final String? privacyUrl;
+  final String? patchNotesUrl;
 
   const _ProjectData({
     required this.title,
@@ -99,6 +100,7 @@ class _ProjectData {
     this.downloadUrl,
     this.downloadLabel = 'APK',
     this.privacyUrl,
+    this.patchNotesUrl,
   });
 }
 
@@ -139,6 +141,7 @@ const _projects = [
     route: '/app/whos-the-nut',
     downloadUrl: 'https://drive.google.com/file/d/1SliqndoB7B_Uoyxa52ZeaueQx3krhbeW/view?usp=sharing',
     privacyUrl: 'apps/whos-the-nut/privacy.html',
+    patchNotesUrl: 'apps/whos-the-nut/release_notes/patch_notes.html',
   ),
   _ProjectData(
     title: '자마카세 인원뽑기',
@@ -376,13 +379,19 @@ class _CodeProjectCardState extends State<_CodeProjectCard> {
               children: p.techTags.map((t) => _TechTag(label: t)).toList(),
             ),
 
-            // Privacy policy slot (always reserved so all cards align)
+            // Privacy / Patch notes slot (always reserved so all cards align)
             const SizedBox(height: 14),
             SizedBox(
               height: 16,
-              child: p.privacyUrl != null
-                  ? _PrivacyLink(url: p.privacyUrl!)
-                  : const SizedBox.shrink(),
+              child: Row(
+                children: [
+                  if (p.privacyUrl != null) _PrivacyLink(url: p.privacyUrl!),
+                  if (p.privacyUrl != null && p.patchNotesUrl != null)
+                    const SizedBox(width: 14),
+                  if (p.patchNotesUrl != null)
+                    _PatchNotesLink(url: p.patchNotesUrl!),
+                ],
+              ),
             ),
           ],
         ),
@@ -426,6 +435,52 @@ class _PrivacyLinkState extends State<_PrivacyLink> {
             const SizedBox(width: 4),
             Text(
               'Privacy Policy',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 11,
+                color: _hovered ? AppColors.signalGreen : AppColors.steel,
+                decoration: _hovered ? TextDecoration.underline : null,
+                decorationColor: AppColors.signalGreen,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PatchNotesLink extends StatefulWidget {
+  final String url;
+  const _PatchNotesLink({required this.url});
+
+  @override
+  State<_PatchNotesLink> createState() => _PatchNotesLinkState();
+}
+
+class _PatchNotesLinkState extends State<_PatchNotesLink> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => web.window.open(widget.url, '_blank'),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.description_outlined,
+              size: 11,
+              color: _hovered ? AppColors.signalGreen : AppColors.steel,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'Patch Notes',
               style: TextStyle(
                 fontFamily: 'Inter',
                 fontSize: 11,
