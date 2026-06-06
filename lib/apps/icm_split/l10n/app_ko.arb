@@ -1,0 +1,21 @@
+{
+  "@@locale": "ko",
+  "appTitle": "ICM Split",
+  "@appTitle": {
+    "description": "Application title shown in the app bar and task switcher."
+  },
+  "tabInput": "입력",
+  "@tabInput": { "description": "Bottom navigation: input tab." },
+  "tabResult": "결과",
+  "@tabResult": { "description": "Bottom navigation: result tab." },
+  "tabDeal": "딜",
+  "@tabDeal": { "description": "Bottom navigation: deal tab." },
+  "tabDecision": "의사결정",
+  "@tabDecision": { "description": "Bottom navigation: decision tab." },
+  "actionSave": "저장",
+  "@actionSave": { "description": "Save current scenario action." },
+  "actionLoad": "불러오기",
+  "@actionLoad": { "description": "Open saved scenarios action." },
+  "actionReset": "새 계산",
+  "@actionReset": { "description": "Reset / new calculation action." }
+}

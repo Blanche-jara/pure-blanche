@@ -144,6 +144,24 @@ const _projects = [
     patchNotesUrl: 'apps/whos-the-nut/release_notes/patch_notes.html',
   ),
   _ProjectData(
+    title: 'ICM Split',
+    subtitle: 'icm-split',
+    description:
+        '포커 토너먼트 막바지 딜(상금 분배)과 의사결정을 ICM 기준으로 계산. '
+        'ICM · Chip-chop · Save-for-winner 세 방식을 비교하고, '
+        '버블에서 콜/폴드를 ICM EV로 판단.',
+    techTags: ['Flutter', 'Dart', 'Riverpod', 'Hive', 'fl_chart'],
+    features: [
+      'ICM 지분(₩) 계산 & 막대그래프 시각화',
+      'ICM / Chip-chop / Save 분배 비교',
+      '버블 팩터 · 콜 필요 에쿼티 · 푸시/폴드 EV',
+      '시나리오 저장 / 불러오기 (로컬)',
+    ],
+    icon: Icons.pie_chart_outline,
+    type: 'flutter',
+    route: '/app/icm-split',
+  ),
+  _ProjectData(
     title: '자마카세 인원뽑기',
     subtitle: 'roulette_app',
     description:

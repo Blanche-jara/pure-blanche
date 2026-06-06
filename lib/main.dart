@@ -9,6 +9,7 @@ import 'apps/jara_holdem/jara_holdem_app.dart';
 import 'apps/roulette/roulette_main.dart';
 import 'apps/web_embed/html_app_page.dart';
 import 'apps/whos_the_nut/whos_the_nut_app.dart';
+import 'apps/icm_split/icm_split_app.dart';
 import 'apps/safe_link/safe_link_app.dart';
 import 'apps/cannon/cannon_app.dart';
 
@@ -51,6 +52,10 @@ class PureBlancheApp extends StatelessWidget {
         '/app/whos-the-nut': (_) => const AppWrapper(
               title: "Who's the Nut?",
               child: WhosTheNutApp(),
+            ),
+        '/app/icm-split': (_) => const AppWrapper(
+              title: 'ICM Split',
+              child: IcmSplitApp(),
             ),
         '/app/safe-link': (_) => const AppWrapper(
               title: "It's Safe Link",
