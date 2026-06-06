@@ -160,6 +160,7 @@ const _projects = [
     icon: Icons.pie_chart_outline,
     type: 'flutter',
     route: '/app/icm-split',
+    downloadUrl: 'https://drive.google.com/file/d/149H-LL1Jxr-hk1EBSzu17rKF2QkpXpfk/view?usp=sharing',
   ),
   _ProjectData(
     title: '자마카세 인원뽑기',
