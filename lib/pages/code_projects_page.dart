@@ -249,6 +249,40 @@ const _projects = [
     downloadUrl: 'https://drive.google.com/uc?export=download&id=1v_DzUDF51JRhPviEllY_UmHQzNqTP-aj',
     downloadLabel: 'EXE',
   ),
+  _ProjectData(
+    title: 'Word Guesser',
+    subtitle: 'word-guesser',
+    description:
+        '카카오톡 "오늘의 단어"(한글 워들) 필승법. 정보이론(엔트로피)으로 최적 추측을 '
+        '추천하고, 칸별 색을 입력하면 후보를 좁혀 5턴 안에 정답에 도달한다.',
+    techTags: ['Flutter', 'Dart', 'Information Theory', 'Hangul'],
+    features: [
+      '한글 자모 분해/펼치기 (복합모음·겹받침)',
+      '엔트로피 최대화 추천 + 5턴 보장 (시뮬)',
+      '칸별 회색/노랑/초록 결과 입력',
+      '키보드 자모 현황 히트맵',
+    ],
+    icon: Icons.grid_view_outlined,
+    type: 'web',
+    route: '/app/word-guesser',
+  ),
+  _ProjectData(
+    title: 'Word Finder',
+    subtitle: 'word-finder',
+    description:
+        '꼬맨틀(한국어 Semantle) 추측 보조기. 단어와 유사도 점수를 입력하면 fastText '
+        '임베딩으로 정답 벡터 방향을 삼각측량해 다음 추천 단어를 정렬한다.',
+    techTags: ['Flutter', 'Dart', 'fastText', 'Embeddings'],
+    features: [
+      '능선 최소제곱 삼각측량 (Cholesky)',
+      '정답 풀 임베딩 51k/4.6k (int8 300d)',
+      '최원점 시드 탐색 + 고유사도 가중',
+      '평균 ~30추측 수렴 (시뮬)',
+    ],
+    icon: Icons.hub_outlined,
+    type: 'web',
+    route: '/app/word-finder',
+  ),
 ];
 
 // ---------------------------------------------------------------------------

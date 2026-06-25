@@ -65,6 +65,14 @@ class PureBlancheApp extends StatelessWidget {
               title: 'THE CANNON',
               child: CannonApp(),
             ),
+        '/app/word-guesser': (_) => const HtmlAppPage(
+              title: 'Word Guesser',
+              htmlPath: 'apps/word-guesser/index.html',
+            ),
+        '/app/word-finder': (_) => const HtmlAppPage(
+              title: 'Word Finder',
+              htmlPath: 'apps/word-finder/index.html',
+            ),
       },
     );
   }
