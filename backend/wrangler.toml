@@ -11,6 +11,5 @@ routes = [
 [[d1_databases]]
 binding = "DB"
 database_name = "pure-blanche-guestbook"
-# 아래 database_id 는 플레이스홀더다.
-# `npx wrangler d1 create pure-blanche-guestbook` 실행 후 출력된 값으로 교체할 것.
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+# D1 database id (`npx wrangler d1 create` 출력값). 계정 인증이 있어야 사용 가능 — 시크릿 아님.
+database_id = "0bb79a1d-6ab4-44dc-b99f-33763820c3e7"
