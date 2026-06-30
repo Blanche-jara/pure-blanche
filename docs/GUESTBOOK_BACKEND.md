@@ -96,7 +96,7 @@ Cloudflare D1 (SQLite, 무료)         ← 방명록 메시지 영구 저장
   - 성공 **200** `{ "message": { id,name,message,created_at } }`. 길이 검증은 작성과 동일(이름30/메시지500). 관리자 수정은 **스팸/링크 필터 미적용**(신뢰 주체).
   - 미인증 **401**, 없음 **404**, 본문 비정상 **400** `invalid_json`/`empty`.
 
-토큰 비교는 길이 일치 확인 후 상수시간 비교(`safeEqual`). 진입 UX: 프론트가 `/#/guestbook?admin`에서 비밀번호를 받아 `verify` 통과 시 `sessionStorage`에 토큰 보관, 세션 동안 관리 컨트롤 노출.
+토큰 비교는 길이 일치 확인 후 상수시간 비교(`safeEqual`). 진입 UX: 프론트가 **`/#/admin`** 전용 라우트(`GuestbookPage(adminEntry: true)`)에서 비밀번호를 받아 `verify` 통과 시 `sessionStorage`에 토큰 보관, 세션 동안 관리 컨트롤 노출. (해시 라우팅 + `MaterialApp.routes` 정확일치 방식이라 `?admin` 쿼리는 라우트 매칭에 실패 → 전용 라우트를 사용한다.)
 
 ## 4. 데이터 / 검증 / 스팸 규칙
 

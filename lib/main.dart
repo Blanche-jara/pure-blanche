@@ -32,6 +32,8 @@ class PureBlancheApp extends StatelessWidget {
         '/code': (_) => const CodeProjectsPage(),
         '/video': (_) => const VideoProjectsPage(),
         '/guestbook': (_) => const GuestbookPage(),
+        // 숨김 관리자 진입점(#/admin). 비밀번호 통과 시 전체 글 수정/삭제.
+        '/admin': (_) => const GuestbookPage(adminEntry: true),
         // Sub-apps
         '/app/jara-holdem': (_) => const AppWrapper(
               title: 'Jara Holdem Timer',

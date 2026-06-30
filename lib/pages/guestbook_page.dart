@@ -6,7 +6,10 @@ import '../services/guestbook_service.dart';
 import '../widgets/page_scaffold.dart';
 
 class GuestbookPage extends StatefulWidget {
-  const GuestbookPage({super.key});
+  const GuestbookPage({super.key, this.adminEntry = false});
+
+  /// 숨김 관리자 진입(`/admin` 라우트)으로 들어왔는지. true면 진입 시 비밀번호 프롬프트.
+  final bool adminEntry;
 
   @override
   State<GuestbookPage> createState() => _GuestbookPageState();
@@ -36,8 +39,8 @@ class _GuestbookPageState extends State<GuestbookPage> {
     super.initState();
     _restoreAdmin();
     _loadEntries();
-    // 숨김 URL(#/guestbook?admin) 진입 시, 아직 인증 전이면 비밀번호 프롬프트.
-    if (!_isAdmin && _adminRequestedFromUrl()) {
+    // 숨김 URL(#/admin) 진입 시, 아직 인증 전이면 비밀번호 프롬프트.
+    if (!_isAdmin && (widget.adminEntry || _adminRequestedFromUrl())) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _promptAdminLogin();
       });

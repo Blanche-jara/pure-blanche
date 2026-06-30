@@ -125,7 +125,7 @@ curl https://api.pure-blanche.com/api/guestbook
 ## 3. 관리자 관리 (전체 글 수정/삭제)
 
 - `ADMIN_TOKEN` secret 을 아는 사람만 모든 글을 수정/삭제할 수 있다. 일반 방문자는 작성만 가능.
-- **진입**: `https://pure-blanche.com/#/guestbook?admin` 접속 → 비밀번호 입력 → 그 세션 동안 관리자 모드(각 글에 수정/삭제 버튼).
+- **진입**: `https://pure-blanche.com/#/admin` 접속 → 비밀번호 입력 → 그 세션 동안 관리자 모드(각 글에 수정/삭제 버튼).
 - 인증 토큰은 브라우저 `sessionStorage`에만 보관되어 탭을 닫으면 사라진다.
 - **시크릿 교체**: `npx wrangler secret put ADMIN_TOKEN` 재실행 → 라이브 워커에 즉시 반영(코드 재배포 불필요).
 - `ADMIN_TOKEN` 미설정 시 관리자 기능은 완전 비활성(모든 관리자 요청 `401`).
