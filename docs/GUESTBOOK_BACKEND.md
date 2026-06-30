@@ -1,0 +1,195 @@
+# 방명록 백엔드 — 설계 + API 계약 (v1)
+
+> **이 문서가 c1(백엔드)과 c2(프론트엔드)의 공유 계약서다.**
+> 양쪽은 서로를 보지 않고 이 명세에만 맞춰 독립적으로 구현한다.
+> 계약을 바꿔야 하면 **먼저 이 문서를 고치고** 양쪽에 반영한다. (이 문서 = 정답)
+
+## 1. 목표와 제약
+
+- **무료 + 진짜 24/7**: 서버리스(Cloudflare Workers + D1). 꺼질 프로세스가 없다. 노트북 의존 0.
+- **Graceful degradation**: 백엔드가 죽어도 **방명록 페이지만** "일시 사용 불가"를 보여주고, 나머지 사이트/서브앱은 100% 정상. (방명록은 이미 별도 `/guestbook` 라우트 + 다른 앱은 이 API를 호출하지 않으므로 구조적으로 보장됨. 프론트는 에러를 삼켜서 사이트를 죽이지 않는 것만 책임진다.)
+- **스팸 방어 수준**: "기본" — IP 기반 rate limit + 길이 제한 + 링크 차단. CAPTCHA 없음(사용자 마찰 0).
+
+## 2. 결정된 아키텍처
+
+```
+브라우저 (Flutter Web, https://pure-blanche.com, GitHub Pages)
+   │  fetch JSON
+   ▼
+https://api.pure-blanche.com         ← Cloudflare Worker (서버리스, 무료)
+   │
+   ▼
+Cloudflare D1 (SQLite, 무료)         ← 방명록 메시지 영구 저장
+```
+
+- 도메인 `pure-blanche.com`은 이미 Cloudflare DNS에 있음 → `api.` 서브도메인을 Worker 커스텀 도메인으로 자동 연결 가능.
+- 무료 한도(Workers 10만 req/일, D1 무료 티어)는 방명록 용도로 차고 넘침.
+
+## 3. API 계약 (정확히 이대로)
+
+**Base URL**
+- 프로덕션: `https://api.pure-blanche.com`
+- 로컬 개발: `http://localhost:8787` (`wrangler dev` 기본 포트)
+
+모든 응답은 `Content-Type: application/json; charset=utf-8`.
+
+### 3.1 `GET /api/guestbook`
+최신 메시지 목록(최신순, 최대 100개).
+
+- **200 OK**
+  ```json
+  {
+    "messages": [
+      { "id": 12, "name": "방문자", "message": "안녕하세요", "created_at": "2026-06-30 04:11:22" },
+      { "id": 11, "name": "Blanche", "message": "방명록에 오신 걸 환영합니다!", "created_at": "2026-04-10 00:00:00" }
+    ]
+  }
+  ```
+- `created_at`: **UTC**, 형식 `"YYYY-MM-DD HH:MM:SS"` (SQLite `datetime('now')` 그대로). 프론트가 로컬 날짜로 변환.
+- 정렬: `id DESC` (최신이 배열 앞).
+
+### 3.2 `POST /api/guestbook`
+새 메시지 작성.
+
+- **요청**: `Content-Type: application/json`
+  ```json
+  { "name": "방문자", "message": "잘 보고 갑니다" }
+  ```
+- **201 Created**
+  ```json
+  { "message": { "id": 13, "name": "방문자", "message": "잘 보고 갑니다", "created_at": "2026-06-30 04:12:00" } }
+  ```
+- **에러** (모두 동일 형태):
+  ```json
+  { "error": "<코드>", "detail": "<사용자에게 보여줄 한국어 문구>" }
+  ```
+
+| status | error 코드 | 조건 | detail(예시) |
+|--------|-----------|------|--------------|
+| 400 | `invalid_json` | 본문이 JSON 아님 | 잘못된 요청입니다. |
+| 400 | `empty` | name 또는 message 공백 | 이름과 메시지를 모두 입력해주세요. |
+| 400 | `name_too_long` | name > 30자 | 이름은 30자 이하로 입력해주세요. |
+| 400 | `message_too_long` | message > 500자 | 메시지는 500자 이하로 입력해주세요. |
+| 422 | `spam` | 링크 포함 | 링크는 작성할 수 없습니다. |
+| 429 | `too_fast` | 같은 IP가 30초 내 재작성 | 잠시 후 다시 시도해주세요. |
+| 429 | `daily_limit` | 같은 IP가 24h 내 20개 초과 | 하루 작성 한도를 초과했습니다. |
+| 500 | `server_error` | 내부 오류 | 서버 오류가 발생했습니다. |
+
+### 3.3 `GET /` 또는 `/health`
+헬스 체크 → **200** `{ "ok": true, "service": "pure-blanche-guestbook" }`
+
+### 3.4 CORS (모든 응답에 포함)
+- `Access-Control-Allow-Origin`: 요청 Origin이 허용 목록이면 그 값 echo, 아니면 `https://pure-blanche.com`.
+  - 허용: `https://pure-blanche.com`, `https://www.pure-blanche.com`, `http://localhost:<포트>`, `http://127.0.0.1:<포트>`
+- `Access-Control-Allow-Methods: GET, POST, OPTIONS`
+- `Access-Control-Allow-Headers: Content-Type`
+- `Vary: Origin`
+- **Preflight** `OPTIONS` → **204 No Content** + 위 헤더.
+
+## 4. 데이터 / 검증 / 스팸 규칙
+
+### 4.1 D1 스키마 (`backend/schema.sql`)
+```sql
+CREATE TABLE IF NOT EXISTS messages (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name       TEXT NOT NULL,
+  message    TEXT NOT NULL,
+  ip_hash    TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_messages_id     ON messages(id DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_iphash ON messages(ip_hash, created_at);
+
+-- 최초 1회: 환영 메시지(이미 있으면 넣지 않음)
+INSERT INTO messages (name, message, created_at)
+SELECT 'Blanche', '방명록에 오신 걸 환영합니다!', datetime('now')
+WHERE NOT EXISTS (SELECT 1 FROM messages);
+```
+
+### 4.2 검증
+- `name`: trim 후 1~30자.
+- `message`: trim 후 1~500자.
+- 저장값은 trim된 원문(이스케이프하지 않음 — 출력은 프론트 `Text` 위젯이라 XSS 무관).
+
+### 4.3 스팸 (기본)
+- 링크 차단: name/message가 정규식 `https?://`, `\bwww\.\w`, `\[url[=\]]` 중 하나라도 매치 → `422 spam`.
+- **Rate limit (IP 해시 기준)**:
+  - 같은 IP 마지막 작성 후 **30초** 미만 → `429 too_fast`.
+  - 같은 IP 최근 **24시간** 내 **20개 이상** → `429 daily_limit`.
+- **IP 프라이버시**: 원본 IP는 저장하지 않는다. `ip_hash = SHA-256(IP_SALT + ":" + ip)` (Web Crypto). IP는 `CF-Connecting-IP` 헤더에서 획득. `IP_SALT`는 Worker secret.
+
+## 5. 백엔드 리포 레이아웃 (c1 담당)
+
+```
+backend/
+├── package.json        # wrangler devDependency + 스크립트
+├── wrangler.toml       # Worker 이름, D1 바인딩(DB), 커스텀 도메인 라우트
+├── schema.sql          # 위 4.1
+├── src/index.js        # Worker (ES module, fetch 핸들러)
+├── .gitignore          # node_modules/, .wrangler/, .dev.vars
+└── README.md           # 배포 절차(아래 6장 요약)
+```
+
+`wrangler.toml` 필수 요소:
+```toml
+name = "pure-blanche-guestbook"
+main = "src/index.js"
+compatibility_date = "2024-11-06"
+
+routes = [
+  { pattern = "api.pure-blanche.com", custom_domain = true }
+]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "pure-blanche-guestbook"
+database_id = "<wrangler d1 create 출력값으로 채움>"
+```
+
+## 6. 배포 절차 (사용자가 실행 — c1은 명령어와 README를 준비)
+
+> 이 단계는 사용자의 Cloudflare 계정 로그인이 필요하므로 **에이전트가 직접 실행하지 않는다.**
+> c1은 코드/설정/README를 완성하고, 아래 명령을 사용자에게 안내한다.
+
+```bash
+cd backend
+npm install
+npx wrangler login                                   # 브라우저 OAuth (1회)
+npx wrangler d1 create pure-blanche-guestbook        # 출력된 database_id를 wrangler.toml에 붙여넣기
+npx wrangler d1 execute pure-blanche-guestbook --remote --file=./schema.sql   # 원격 DB에 테이블 생성
+npx wrangler secret put IP_SALT                       # 아무 랜덤 문자열 입력(예: openssl rand -hex 16)
+npx wrangler deploy                                   # 배포 + api.pure-blanche.com 자동 연결
+```
+
+- 커스텀 도메인은 `routes`의 `custom_domain = true` 덕분에 배포 시 DNS 레코드+인증서가 자동 생성됨(존이 Cloudflare에 있으므로).
+- 로컬 테스트: `npx wrangler dev` → `http://localhost:8787` + 로컬 D1(`--local`로 schema 먼저 주입).
+
+## 7. 프론트엔드 통합 요구사항 (c2 담당)
+
+- `http` 패키지 추가(`pubspec.yaml`).
+- 신설 `lib/services/guestbook_service.dart`:
+  - Base URL은 `String.fromEnvironment('GUESTBOOK_API', defaultValue: 'https://api.pure-blanche.com')`.
+    - 로컬 개발 시: `flutter run -d chrome --dart-define=GUESTBOOK_API=http://localhost:8787`.
+  - `fetchEntries()` → `List<GuestEntry>`, `submit(name, message)` → `GuestEntry`.
+  - 모든 네트워크 오류/타임아웃(10s)을 잡아 사용자용 한국어 메시지를 던진다. **앱을 크래시시키지 않는다.**
+  - `created_at`(UTC "YYYY-MM-DD HH:MM:SS")를 파싱해 로컬 `YYYY.MM.DD`로 표시.
+- `lib/pages/guestbook_page.dart` 재작성:
+  - "공사중" 오버레이 **제거**.
+  - 진입 시 목록 로드 → 로딩 스피너 / 목록 / **에러 카드(재시도 버튼)** 3-상태.
+  - 작성: 전송 중 버튼 비활성+로딩, 성공 시 새 항목을 리스트 맨 앞에 추가(또는 재조회), 실패 시 인라인 에러 + 입력 내용 유지.
+  - 이름 30자 / 메시지 500자 입력 제한(백엔드와 동일).
+  - 기존 디자인 토큰(`AppColors`)과 위젯 스타일 유지.
+
+## 8. 인수 기준 (양쪽 공통 체크리스트)
+
+**백엔드 (c1)**
+- [ ] `wrangler dev`로 로컬 기동, `GET /api/guestbook` → `{messages:[...]}` (환영 메시지 1개 포함).
+- [ ] `POST` 정상 → 201 + 생성 객체. 빈 값/초장문/링크/연속작성 → 각 4xx 코드 정확히.
+- [ ] CORS 프리플라이트(OPTIONS) 204 + 헤더. 허용 Origin echo.
+- [ ] 원본 IP 미저장(ip_hash만). README에 배포 명령 완비.
+
+**프론트 (c2)**
+- [ ] `flutter analyze` 통과. 빌드 성공.
+- [ ] API 응답 → 목록 렌더. 작성 → 즉시 반영.
+- [ ] **백엔드 down 시뮬레이션**(잘못된 URL): 방명록만 에러 카드, 다른 페이지/앱 정상. 콘솔 예외로 앱이 죽지 않음.
+- [ ] 공사중 오버레이 사라짐. 글자수 제한 동작.

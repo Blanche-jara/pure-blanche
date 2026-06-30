@@ -44,6 +44,7 @@ dependencies:
   web: ^1.1.1
   url_launcher: ^6.3.2
   pointer_interceptor: ^0.10.1+2
+  http: ^1.2.2
 
   # ICM Split 서브앱(lib/apps/icm_split/) 의존성.
   flutter_riverpod: ^3.3.1

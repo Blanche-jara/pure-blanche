@@ -1,0 +1,158 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+
+/// 방명록 백엔드 API 클라이언트.
+///
+/// 계약 문서: `docs/GUESTBOOK_BACKEND.md` (3장 API 계약).
+/// 모든 네트워크/타임아웃/파싱 오류는 [GuestbookException]으로 변환되어
+/// 사용자용 한국어 메시지를 담는다. 앱을 크래시시키지 않는다.
+class GuestbookService {
+  GuestbookService({http.Client? client}) : _client = client ?? http.Client();
+
+  /// Base URL. 로컬 개발 시:
+  /// `flutter run -d chrome --dart-define=GUESTBOOK_API=http://localhost:8787`
+  static const String baseUrl = String.fromEnvironment(
+    'GUESTBOOK_API',
+    defaultValue: 'https://api.pure-blanche.com',
+  );
+
+  static const Duration _timeout = Duration(seconds: 10);
+
+  final http.Client _client;
+
+  /// 최신 방명록 목록(최신순). GET /api/guestbook
+  Future<List<GuestEntry>> fetchEntries() async {
+    final uri = Uri.parse('$baseUrl/api/guestbook');
+    try {
+      final res = await _client.get(uri).timeout(_timeout);
+      if (res.statusCode != 200) {
+        throw GuestbookException(_detailFromBody(res.bodyBytes) ??
+            '방명록을 불러오지 못했습니다. (${res.statusCode})');
+      }
+      final decoded = jsonDecode(utf8.decode(res.bodyBytes));
+      final list = (decoded is Map<String, dynamic>) ? decoded['messages'] : null;
+      if (list is! List) {
+        throw const GuestbookException('방명록 응답 형식이 올바르지 않습니다.');
+      }
+      return list
+          .whereType<Map<String, dynamic>>()
+          .map(GuestEntry.fromJson)
+          .toList();
+    } on GuestbookException {
+      rethrow;
+    } on TimeoutException {
+      throw const GuestbookException('서버 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요.');
+    } catch (_) {
+      throw const GuestbookException('방명록을 불러오지 못했습니다. 네트워크 상태를 확인해주세요.');
+    }
+  }
+
+  /// 새 방명록 작성. POST /api/guestbook → 201이면 생성된 [GuestEntry] 반환.
+  Future<GuestEntry> submit({
+    required String name,
+    required String message,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/guestbook');
+    try {
+      final res = await _client
+          .post(
+            uri,
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode({'name': name, 'message': message}),
+          )
+          .timeout(_timeout);
+
+      if (res.statusCode == 201) {
+        final decoded = jsonDecode(utf8.decode(res.bodyBytes));
+        final msg = (decoded is Map<String, dynamic>) ? decoded['message'] : null;
+        if (msg is! Map<String, dynamic>) {
+          throw const GuestbookException('작성 응답 형식이 올바르지 않습니다.');
+        }
+        return GuestEntry.fromJson(msg);
+      }
+
+      // 그 외 상태코드: 백엔드가 내려준 detail/error를 사용자 메시지로.
+      throw GuestbookException(
+          _detailFromBody(res.bodyBytes) ?? '작성에 실패했습니다. (${res.statusCode})');
+    } on GuestbookException {
+      rethrow;
+    } on TimeoutException {
+      throw const GuestbookException('서버 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요.');
+    } catch (_) {
+      throw const GuestbookException('작성에 실패했습니다. 네트워크 상태를 확인해주세요.');
+    }
+  }
+
+  /// 에러 응답 본문에서 사용자용 문구(detail) 또는 error 코드를 추출한다.
+  /// 파싱 불가 시 null.
+  String? _detailFromBody(List<int> bodyBytes) {
+    try {
+      final decoded = jsonDecode(utf8.decode(bodyBytes));
+      if (decoded is Map<String, dynamic>) {
+        final detail = decoded['detail'];
+        if (detail is String && detail.trim().isNotEmpty) return detail;
+        final error = decoded['error'];
+        if (error is String && error.trim().isNotEmpty) return error;
+      }
+    } catch (_) {
+      // 파싱 실패 → null 반환.
+    }
+    return null;
+  }
+
+  void dispose() => _client.close();
+}
+
+/// 방명록 한 항목.
+class GuestEntry {
+  const GuestEntry({
+    required this.id,
+    required this.name,
+    required this.message,
+    required this.createdAt,
+  });
+
+  final int id;
+  final String name;
+  final String message;
+
+  /// 로컬 시간대로 변환된 작성 시각.
+  final DateTime createdAt;
+
+  factory GuestEntry.fromJson(Map<String, dynamic> json) {
+    return GuestEntry(
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      name: (json['name'] as String?) ?? '',
+      message: (json['message'] as String?) ?? '',
+      createdAt: _parseCreatedAt(json['created_at'] as String?),
+    );
+  }
+
+  /// `created_at`은 UTC "YYYY-MM-DD HH:MM:SS". 'T' 구분자 + 'Z'를 붙여
+  /// UTC로 파싱한 뒤 로컬로 변환한다.
+  static DateTime _parseCreatedAt(String? raw) {
+    if (raw == null || raw.isEmpty) return DateTime.now();
+    final normalized = '${raw.trim().replaceFirst(' ', 'T')}Z';
+    final parsed = DateTime.tryParse(normalized);
+    return (parsed ?? DateTime.now().toUtc()).toLocal();
+  }
+
+  /// 로컬 'YYYY.MM.DD' 표시용.
+  String get localDate {
+    final d = createdAt;
+    final mm = d.month.toString().padLeft(2, '0');
+    final dd = d.day.toString().padLeft(2, '0');
+    return '${d.year}.$mm.$dd';
+  }
+}
+
+/// 사용자에게 그대로 보여줄 수 있는 한국어 메시지를 담은 예외.
+class GuestbookException implements Exception {
+  const GuestbookException(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
+}

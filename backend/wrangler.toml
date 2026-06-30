@@ -1,0 +1,16 @@
+name = "pure-blanche-guestbook"
+main = "src/index.js"
+compatibility_date = "2024-11-06"
+
+# 커스텀 도메인. 존(pure-blanche.com)이 Cloudflare에 있으므로
+# 배포 시 DNS 레코드 + 인증서가 자동 생성된다.
+routes = [
+  { pattern = "api.pure-blanche.com", custom_domain = true }
+]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "pure-blanche-guestbook"
+# 아래 database_id 는 플레이스홀더다.
+# `npx wrangler d1 create pure-blanche-guestbook` 실행 후 출력된 값으로 교체할 것.
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
