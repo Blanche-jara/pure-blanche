@@ -21,10 +21,13 @@ API 계약의 정답은 [`docs/GUESTBOOK_BACKEND.md`](../docs/GUESTBOOK_BACKEND.
 |--------|------|------|
 | `GET` | `/api/guestbook` | `200 {messages:[{id,name,message,created_at}]}` (id DESC, ≤100) |
 | `POST` | `/api/guestbook` | `201 {message:{...}}` / 에러 `{error,detail}` |
+| `PATCH` | `/api/guestbook/:id` | 🔒 관리자 — `200 {message:{...}}` (name/message 수정) |
+| `DELETE` | `/api/guestbook/:id` | 🔒 관리자 — `200 {ok:true,deleted:id}` |
+| `GET`/`POST` | `/api/admin/verify` | 🔒 관리자 비번 확인 — `200 {ok:true}` / `401` |
 | `GET` | `/` 또는 `/health` | `200 {ok:true,service:"pure-blanche-guestbook"}` |
 | `OPTIONS` | (전체) | `204` + CORS 헤더 |
 
-검증/스팸/rate-limit 규칙과 에러 코드 표는 계약 문서 3~4장 참조.
+🔒 = `Authorization: Bearer <ADMIN_TOKEN>` 헤더 필요. 검증/스팸/rate-limit 규칙과 에러 코드 표는 계약 문서 3~4장 참조.
 
 ---
 
@@ -91,6 +94,9 @@ npx wrangler d1 execute pure-blanche-guestbook --remote --file=./schema.sql
 # 4) IP 해시용 secret 설정 (예: openssl rand -hex 16 의 출력값 입력)
 npx wrangler secret put IP_SALT
 
+# 4-b) 관리자 비밀번호 secret 설정 (전체 글 수정/삭제 권한 — 강한 랜덤 권장: openssl rand -hex 24)
+npx wrangler secret put ADMIN_TOKEN
+
 # 5) 배포 (+ api.pure-blanche.com 커스텀 도메인 자동 생성)
 npx wrangler deploy
 ```
@@ -113,3 +119,14 @@ curl https://api.pure-blanche.com/api/guestbook
 
 프론트엔드는 `--dart-define=GUESTBOOK_API=...`로 베이스 URL을 주입한다(기본값은 프로덕션).
 로컬 통합 테스트: `flutter run -d chrome --dart-define=GUESTBOOK_API=http://localhost:8787`.
+
+---
+
+## 3. 관리자 관리 (전체 글 수정/삭제)
+
+- `ADMIN_TOKEN` secret 을 아는 사람만 모든 글을 수정/삭제할 수 있다. 일반 방문자는 작성만 가능.
+- **진입**: `https://pure-blanche.com/#/guestbook?admin` 접속 → 비밀번호 입력 → 그 세션 동안 관리자 모드(각 글에 수정/삭제 버튼).
+- 인증 토큰은 브라우저 `sessionStorage`에만 보관되어 탭을 닫으면 사라진다.
+- **시크릿 교체**: `npx wrangler secret put ADMIN_TOKEN` 재실행 → 라이브 워커에 즉시 반영(코드 재배포 불필요).
+- `ADMIN_TOKEN` 미설정 시 관리자 기능은 완전 비활성(모든 관리자 요청 `401`).
+- 관리자 수정(`PATCH`)은 신뢰 주체로 간주하여 링크/스팸 필터를 적용하지 않는다.

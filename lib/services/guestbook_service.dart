@@ -85,6 +85,89 @@ class GuestbookService {
     }
   }
 
+  /// 관리자 비밀번호(토큰) 검증. POST /api/admin/verify (Bearer).
+  /// 올바르면 true, 틀리면 false. 네트워크/타임아웃 오류는 예외.
+  Future<bool> verifyAdmin(String token) async {
+    final uri = Uri.parse('$baseUrl/api/admin/verify');
+    try {
+      final res = await _client.post(
+        uri,
+        headers: {'Authorization': 'Bearer $token'},
+      ).timeout(_timeout);
+      return res.statusCode == 200;
+    } on TimeoutException {
+      throw const GuestbookException('서버 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요.');
+    } catch (_) {
+      throw const GuestbookException('인증 서버에 연결할 수 없습니다.');
+    }
+  }
+
+  /// 관리자: 글 삭제. DELETE /api/guestbook/{id} (Bearer).
+  Future<void> deleteEntry(int id, {required String adminToken}) async {
+    final uri = Uri.parse('$baseUrl/api/guestbook/$id');
+    try {
+      final res = await _client.delete(
+        uri,
+        headers: {'Authorization': 'Bearer $adminToken'},
+      ).timeout(_timeout);
+      if (res.statusCode == 200) return;
+      if (res.statusCode == 401) {
+        throw const GuestbookException('관리자 인증이 만료되었습니다. 다시 로그인해주세요.',
+            authExpired: true);
+      }
+      throw GuestbookException(
+          _detailFromBody(res.bodyBytes) ?? '삭제에 실패했습니다. (${res.statusCode})');
+    } on GuestbookException {
+      rethrow;
+    } on TimeoutException {
+      throw const GuestbookException('서버 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요.');
+    } catch (_) {
+      throw const GuestbookException('삭제에 실패했습니다. 네트워크 상태를 확인해주세요.');
+    }
+  }
+
+  /// 관리자: 글 수정. PATCH /api/guestbook/{id} (Bearer). 수정된 [GuestEntry] 반환.
+  Future<GuestEntry> updateEntry(
+    int id, {
+    required String name,
+    required String message,
+    required String adminToken,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/guestbook/$id');
+    try {
+      final res = await _client
+          .patch(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $adminToken',
+            },
+            body: jsonEncode({'name': name, 'message': message}),
+          )
+          .timeout(_timeout);
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(res.bodyBytes));
+        final msg = (decoded is Map<String, dynamic>) ? decoded['message'] : null;
+        if (msg is! Map<String, dynamic>) {
+          throw const GuestbookException('수정 응답 형식이 올바르지 않습니다.');
+        }
+        return GuestEntry.fromJson(msg);
+      }
+      if (res.statusCode == 401) {
+        throw const GuestbookException('관리자 인증이 만료되었습니다. 다시 로그인해주세요.',
+            authExpired: true);
+      }
+      throw GuestbookException(
+          _detailFromBody(res.bodyBytes) ?? '수정에 실패했습니다. (${res.statusCode})');
+    } on GuestbookException {
+      rethrow;
+    } on TimeoutException {
+      throw const GuestbookException('서버 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요.');
+    } catch (_) {
+      throw const GuestbookException('수정에 실패했습니다. 네트워크 상태를 확인해주세요.');
+    }
+  }
+
   /// 에러 응답 본문에서 사용자용 문구(detail) 또는 error 코드를 추출한다.
   /// 파싱 불가 시 null.
   String? _detailFromBody(List<int> bodyBytes) {
@@ -150,8 +233,11 @@ class GuestEntry {
 
 /// 사용자에게 그대로 보여줄 수 있는 한국어 메시지를 담은 예외.
 class GuestbookException implements Exception {
-  const GuestbookException(this.message);
+  const GuestbookException(this.message, {this.authExpired = false});
   final String message;
+
+  /// 관리자 인증 만료/실패(401)로 인한 예외면 true. UI가 관리자 모드를 해제하는 데 사용.
+  final bool authExpired;
 
   @override
   String toString() => message;

@@ -81,10 +81,22 @@ Cloudflare D1 (SQLite, 무료)         ← 방명록 메시지 영구 저장
 ### 3.4 CORS (모든 응답에 포함)
 - `Access-Control-Allow-Origin`: 요청 Origin이 허용 목록이면 그 값 echo, 아니면 `https://pure-blanche.com`.
   - 허용: `https://pure-blanche.com`, `https://www.pure-blanche.com`, `http://localhost:<포트>`, `http://127.0.0.1:<포트>`
-- `Access-Control-Allow-Methods: GET, POST, OPTIONS`
-- `Access-Control-Allow-Headers: Content-Type`
+- `Access-Control-Allow-Methods: GET, POST, PATCH, DELETE, OPTIONS`
+- `Access-Control-Allow-Headers: Content-Type, Authorization`
 - `Vary: Origin`
 - **Preflight** `OPTIONS` → **204 No Content** + 위 헤더.
+
+### 3.5 관리자 관리 (v1.1)
+일반 방문자는 작성만 가능. **모든 글의 수정/삭제는 관리자 전용**이며 `Authorization: Bearer <ADMIN_TOKEN>`로 인증한다(`ADMIN_TOKEN`은 Worker secret). 미설정 시 관리자 기능은 비활성(모든 관리자 요청 401).
+
+- `GET`/`POST` **`/api/admin/verify`** — 비밀번호 확인용. 일치 시 **200** `{ "ok": true }`, 아니면 **401** `{ "error":"unauthorized", "detail":"비밀번호가 올바르지 않습니다." }`.
+- `DELETE` **`/api/guestbook/:id`** — 관리자 인증 필요.
+  - 성공 **200** `{ "ok": true, "deleted": <id> }` / 없음 **404** `not_found` / 미인증 **401** `unauthorized`.
+- `PATCH` **`/api/guestbook/:id`** — 관리자 인증 필요. 본문 `{ "name"?: string, "message"?: string }`(둘 중 하나 이상).
+  - 성공 **200** `{ "message": { id,name,message,created_at } }`. 길이 검증은 작성과 동일(이름30/메시지500). 관리자 수정은 **스팸/링크 필터 미적용**(신뢰 주체).
+  - 미인증 **401**, 없음 **404**, 본문 비정상 **400** `invalid_json`/`empty`.
+
+토큰 비교는 길이 일치 확인 후 상수시간 비교(`safeEqual`). 진입 UX: 프론트가 `/#/guestbook?admin`에서 비밀번호를 받아 `verify` 통과 시 `sessionStorage`에 토큰 보관, 세션 동안 관리 컨트롤 노출.
 
 ## 4. 데이터 / 검증 / 스팸 규칙
 

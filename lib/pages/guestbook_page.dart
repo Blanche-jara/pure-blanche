@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:web/web.dart' as web;
 import '../theme/app_colors.dart';
 import '../services/guestbook_service.dart';
 import '../widgets/page_scaffold.dart';
@@ -25,10 +26,22 @@ class _GuestbookPageState extends State<GuestbookPage> {
   bool _submitting = false;
   String? _submitError;
 
+  // 관리자 상태. _adminToken != null 이면 관리자 모드.
+  static const String _adminStorageKey = 'pb_admin_token';
+  String? _adminToken;
+  bool get _isAdmin => _adminToken != null;
+
   @override
   void initState() {
     super.initState();
+    _restoreAdmin();
     _loadEntries();
+    // 숨김 URL(#/guestbook?admin) 진입 시, 아직 인증 전이면 비밀번호 프롬프트.
+    if (!_isAdmin && _adminRequestedFromUrl()) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _promptAdminLogin();
+      });
+    }
   }
 
   @override
@@ -104,6 +117,117 @@ class _GuestbookPageState extends State<GuestbookPage> {
     }
   }
 
+  // ── 관리자 모드 ──────────────────────────────────────────────────────
+  // 해시 라우팅이므로 전체 URL(예: .../#/guestbook?admin)에 admin이 있으면 진입.
+  bool _adminRequestedFromUrl() =>
+      Uri.base.toString().toLowerCase().contains('admin');
+
+  void _restoreAdmin() {
+    try {
+      final saved = web.window.sessionStorage.getItem(_adminStorageKey);
+      if (saved != null && saved.isNotEmpty) _adminToken = saved;
+    } catch (_) {
+      // sessionStorage 비활성 등 — 무시(비관리자 모드 유지).
+    }
+  }
+
+  void _saveAdmin(String token) {
+    _adminToken = token;
+    try {
+      web.window.sessionStorage.setItem(_adminStorageKey, token);
+    } catch (_) {}
+  }
+
+  void _exitAdmin() {
+    setState(() => _adminToken = null);
+    try {
+      web.window.sessionStorage.removeItem(_adminStorageKey);
+    } catch (_) {}
+  }
+
+  /// 관리자 토큰 만료(401) 공통 처리: 안내 + 관리자 모드 해제.
+  void _handleAdminExpired() {
+    _showSnack('관리자 인증이 만료되었습니다. 다시 로그인해주세요.');
+    _exitAdmin();
+  }
+
+  Future<void> _promptAdminLogin() async {
+    final controller = TextEditingController();
+    final token = await showDialog<String>(
+      context: context,
+      builder: (_) => _AdminLoginDialog(
+        controller: controller,
+        onVerify: _service.verifyAdmin,
+      ),
+    );
+    controller.dispose();
+    if (token != null && token.isNotEmpty && mounted) {
+      setState(() => _saveAdmin(token));
+    }
+  }
+
+  Future<void> _confirmDelete(GuestEntry entry) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => _ConfirmDialog(
+        title: '방명록 삭제',
+        body: '"${entry.name}" 님의 글을 삭제할까요?\n이 작업은 되돌릴 수 없습니다.',
+        confirmLabel: '삭제',
+        danger: true,
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final token = _adminToken;
+    if (token == null) return;
+    try {
+      await _service.deleteEntry(entry.id, adminToken: token);
+      if (!mounted) return;
+      setState(
+          () => _entries = _entries.where((e) => e.id != entry.id).toList());
+    } on GuestbookException catch (e) {
+      if (!mounted) return;
+      if (e.authExpired) {
+        _handleAdminExpired();
+      } else {
+        _showSnack(e.message);
+      }
+    }
+  }
+
+  Future<void> _editEntry(GuestEntry entry) async {
+    final token = _adminToken;
+    if (token == null) return;
+    final result = await showDialog<GuestEntry>(
+      context: context,
+      builder: (_) => _AdminEditDialog(
+        entry: entry,
+        onSave: (name, message) => _service.updateEntry(
+          entry.id,
+          name: name,
+          message: message,
+          adminToken: token,
+        ),
+        onAuthExpired: _handleAdminExpired,
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _entries =
+            _entries.map((e) => e.id == result.id ? result : e).toList();
+      });
+    }
+  }
+
+  void _showSnack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: const TextStyle(fontFamily: 'Inter')),
+        backgroundColor: AppColors.carbon,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return PageScaffold(
@@ -126,6 +250,10 @@ class _GuestbookPageState extends State<GuestbookPage> {
             'Leave a Message',
             style: Theme.of(context).textTheme.displayMedium,
           ),
+          if (_isAdmin) ...[
+            const SizedBox(height: 16),
+            _AdminBar(onExit: _exitAdmin),
+          ],
           const SizedBox(height: 48),
 
           // Input form
@@ -276,6 +404,25 @@ class _GuestbookPageState extends State<GuestbookPage> {
                     color: AppColors.parchment,
                   ),
                 ),
+                if (_isAdmin) ...[
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      _AdminAction(
+                        icon: Icons.edit_outlined,
+                        label: '수정',
+                        onTap: () => _editEntry(entry),
+                      ),
+                      const SizedBox(width: 8),
+                      _AdminAction(
+                        icon: Icons.delete_outline,
+                        label: '삭제',
+                        danger: true,
+                        onTap: () => _confirmDelete(entry),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -502,4 +649,461 @@ class _SubmitButtonState extends State<_SubmitButton> {
       ),
     );
   }
+}
+
+/// 관리자 모드 표시 + 종료 배너.
+class _AdminBar extends StatelessWidget {
+  final VoidCallback onExit;
+  const _AdminBar({required this.onExit});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.signalGreen.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppColors.signalGreen.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.shield_outlined,
+              size: 16, color: AppColors.signalGreen),
+          const SizedBox(width: 8),
+          const Text(
+            '관리자 모드 — 모든 글 수정·삭제 가능',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.signalGreen,
+            ),
+          ),
+          const SizedBox(width: 14),
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: onExit,
+              child: const Text(
+                '종료',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  color: AppColors.steel,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 관리자용 글 작업 버튼(수정/삭제).
+class _AdminAction extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final bool danger;
+  final VoidCallback onTap;
+  const _AdminAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.danger = false,
+  });
+
+  @override
+  State<_AdminAction> createState() => _AdminActionState();
+}
+
+class _AdminActionState extends State<_AdminAction> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = widget.danger ? AppColors.danger : AppColors.signalGreen;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: AppColors.abyss,
+            borderRadius: BorderRadius.circular(6),
+            border:
+                Border.all(color: _hovered ? accent : AppColors.warmCharcoal),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(widget.icon,
+                  size: 15, color: _hovered ? accent : AppColors.steel),
+              const SizedBox(width: 6),
+              Text(
+                widget.label,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  color: _hovered ? accent : AppColors.parchment,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 관리자 비밀번호 입력 다이얼로그. 검증 성공 시 입력한 토큰을 pop으로 반환.
+class _AdminLoginDialog extends StatefulWidget {
+  final TextEditingController controller;
+  final Future<bool> Function(String) onVerify;
+  const _AdminLoginDialog({required this.controller, required this.onVerify});
+
+  @override
+  State<_AdminLoginDialog> createState() => _AdminLoginDialogState();
+}
+
+class _AdminLoginDialogState extends State<_AdminLoginDialog> {
+  bool _busy = false;
+  String? _error;
+
+  Future<void> _submit() async {
+    final value = widget.controller.text.trim();
+    if (value.isEmpty || _busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final ok = await widget.onVerify(value);
+      if (!mounted) return;
+      if (ok) {
+        Navigator.of(context).pop(value);
+      } else {
+        setState(() {
+          _busy = false;
+          _error = '비밀번호가 올바르지 않습니다.';
+        });
+      }
+    } on GuestbookException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = e.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = '인증에 실패했습니다.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppColors.carbon,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: const BorderSide(color: AppColors.warmCharcoal),
+      ),
+      title: const Text(
+        '관리자 인증',
+        style: TextStyle(
+          fontFamily: 'Segoe UI',
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          color: AppColors.snow,
+        ),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: widget.controller,
+            autofocus: true,
+            obscureText: true,
+            enabled: !_busy,
+            onSubmitted: (_) => _submit(),
+            style: const TextStyle(
+                fontFamily: 'Inter', fontSize: 15, color: AppColors.snow),
+            decoration: _dialogInput('관리자 비밀번호'),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 10),
+            Text(_error!,
+                style: const TextStyle(
+                    fontFamily: 'Inter', fontSize: 13, color: AppColors.danger)),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.of(context).pop(),
+          child: const Text('취소',
+              style: TextStyle(fontFamily: 'Inter', color: AppColors.steel)),
+        ),
+        TextButton(
+          onPressed: _busy ? null : _submit,
+          child: _busy
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(AppColors.signalGreen)),
+                )
+              : const Text('확인',
+                  style: TextStyle(
+                      fontFamily: 'Inter',
+                      color: AppColors.mint,
+                      fontWeight: FontWeight.w600)),
+        ),
+      ],
+    );
+  }
+}
+
+/// 확인/취소 다이얼로그. pop(true)=확인.
+class _ConfirmDialog extends StatelessWidget {
+  final String title;
+  final String body;
+  final String confirmLabel;
+  final bool danger;
+  const _ConfirmDialog({
+    required this.title,
+    required this.body,
+    required this.confirmLabel,
+    this.danger = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppColors.carbon,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: const BorderSide(color: AppColors.warmCharcoal),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontFamily: 'Segoe UI',
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          color: AppColors.snow,
+        ),
+      ),
+      content: Text(
+        body,
+        style: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 14,
+            height: 1.6,
+            color: AppColors.parchment),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('취소',
+              style: TextStyle(fontFamily: 'Inter', color: AppColors.steel)),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: Text(confirmLabel,
+              style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontWeight: FontWeight.w600,
+                  color: danger ? AppColors.danger : AppColors.mint)),
+        ),
+      ],
+    );
+  }
+}
+
+/// 관리자용 글 수정 다이얼로그. 저장 성공 시 수정된 GuestEntry를 pop으로 반환.
+class _AdminEditDialog extends StatefulWidget {
+  final GuestEntry entry;
+  final Future<GuestEntry> Function(String name, String message) onSave;
+  final VoidCallback onAuthExpired;
+  const _AdminEditDialog({
+    required this.entry,
+    required this.onSave,
+    required this.onAuthExpired,
+  });
+
+  @override
+  State<_AdminEditDialog> createState() => _AdminEditDialogState();
+}
+
+class _AdminEditDialogState extends State<_AdminEditDialog> {
+  late final TextEditingController _name =
+      TextEditingController(text: widget.entry.name);
+  late final TextEditingController _message =
+      TextEditingController(text: widget.entry.message);
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _message.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_busy) return;
+    final name = _name.text.trim();
+    final message = _message.text.trim();
+    if (name.isEmpty || message.isEmpty) {
+      setState(() => _error = '이름과 메시지를 모두 입력해주세요.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final updated = await widget.onSave(name, message);
+      if (!mounted) return;
+      Navigator.of(context).pop(updated);
+    } on GuestbookException catch (e) {
+      if (!mounted) return;
+      // 토큰 만료면 다이얼로그를 닫고 관리자 모드를 해제(삭제 경로와 일관).
+      if (e.authExpired) {
+        Navigator.of(context).pop();
+        widget.onAuthExpired();
+        return;
+      }
+      setState(() {
+        _busy = false;
+        _error = e.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = '수정에 실패했습니다.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppColors.carbon,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: const BorderSide(color: AppColors.warmCharcoal),
+      ),
+      title: const Text(
+        '방명록 수정',
+        style: TextStyle(
+          fontFamily: 'Segoe UI',
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          color: AppColors.snow,
+        ),
+      ),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _name,
+              maxLines: 1,
+              maxLength: 30,
+              enabled: !_busy,
+              inputFormatters: [LengthLimitingTextInputFormatter(30)],
+              style: const TextStyle(
+                  fontFamily: 'Inter', fontSize: 15, color: AppColors.snow),
+              decoration: _dialogInput('이름'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _message,
+              maxLines: 5,
+              maxLength: 500,
+              enabled: !_busy,
+              inputFormatters: [LengthLimitingTextInputFormatter(500)],
+              style: const TextStyle(
+                  fontFamily: 'Inter', fontSize: 15, color: AppColors.snow),
+              decoration: _dialogInput('메시지'),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 6),
+              Text(_error!,
+                  style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 13,
+                      color: AppColors.danger)),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.of(context).pop(),
+          child: const Text('취소',
+              style: TextStyle(fontFamily: 'Inter', color: AppColors.steel)),
+        ),
+        TextButton(
+          onPressed: _busy ? null : _save,
+          child: _busy
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(AppColors.signalGreen)),
+                )
+              : const Text('저장',
+                  style: TextStyle(
+                      fontFamily: 'Inter',
+                      color: AppColors.mint,
+                      fontWeight: FontWeight.w600)),
+        ),
+      ],
+    );
+  }
+}
+
+/// 다이얼로그 입력 필드 공통 데코레이션.
+InputDecoration _dialogInput(String hint) {
+  return InputDecoration(
+    hintText: hint,
+    hintStyle: const TextStyle(fontFamily: 'Inter', color: AppColors.steel),
+    counterStyle:
+        const TextStyle(fontFamily: 'Inter', fontSize: 12, color: AppColors.steel),
+    filled: true,
+    fillColor: AppColors.abyss,
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(6),
+      borderSide: const BorderSide(color: AppColors.warmCharcoal),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(6),
+      borderSide: const BorderSide(color: AppColors.signalGreen),
+    ),
+    disabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(6),
+      borderSide: const BorderSide(color: AppColors.warmCharcoal),
+    ),
+    contentPadding: const EdgeInsets.all(14),
+  );
 }
