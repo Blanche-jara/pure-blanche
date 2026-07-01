@@ -24,6 +24,9 @@ API 계약의 정답은 [`docs/GUESTBOOK_BACKEND.md`](../docs/GUESTBOOK_BACKEND.
 | `PATCH` | `/api/guestbook/:id` | 🔒 관리자 — `200 {message:{...}}` (name/message 수정) |
 | `DELETE` | `/api/guestbook/:id` | 🔒 관리자 — `200 {ok:true,deleted:id}` |
 | `GET`/`POST` | `/api/admin/verify` | 🔒 관리자 비번 확인 — `200 {ok:true}` / `401` |
+| `POST` | `/api/hit` | 접속 기록(공개) — `{page}`(10개 슬러그) → `200 {ok:true}` |
+| `POST` | `/api/wg/answer` | Word Guesser 정답 보고(공개) — `{variant,answer}` → `200 {ok:true}` |
+| `GET` | `/api/stats` | 🔒 관리자 통계 — `{pages:[{page,total,today,unique_today}], wgToday:[{variant,answer,n,users}]}` |
 | `GET` | `/` 또는 `/health` | `200 {ok:true,service:"pure-blanche-guestbook"}` |
 | `OPTIONS` | (전체) | `204` + CORS 헤더 |
 

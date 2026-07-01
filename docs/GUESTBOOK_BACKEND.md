@@ -98,6 +98,22 @@ Cloudflare D1 (SQLite, 무료)         ← 방명록 메시지 영구 저장
 
 토큰 비교는 길이 일치 확인 후 상수시간 비교(`safeEqual`). 진입 UX: 프론트가 **`/#/admin`** 전용 라우트(`GuestbookPage(adminEntry: true)`)에서 비밀번호를 받아 `verify` 통과 시 `sessionStorage`에 토큰 보관, 세션 동안 관리 컨트롤 노출. (해시 라우팅 + `MaterialApp.routes` 정확일치 방식이라 `?admin` 쿼리는 라우트 매칭에 실패 → 전용 라우트를 사용한다.)
 
+### 3.6 접속 통계 + Word Guesser 정답 (v1.2)
+코드 프로젝트 페이지 접속량과 Word Guesser "오늘의 정답"을 관리자 탭에서 본다.
+
+- `POST` **`/api/hit`** — 공개. `{ "page": "<슬러그>" }`. 슬러그 화이트리스트(10개): jara-holdem/roulette/whos-the-nut/icm-split/safe-link/cannon/jamakase/birthday/word-guesser/word-finder. 화이트리스트 외 → 400 `bad_page`. `page_views(page, ip_hash, day)` 1행 기록(`day`=KST 날짜). 메인 앱의 `AppWrapper`/`HtmlAppPage` 진입 시 호출.
+- `POST` **`/api/wg/answer`** — 공개(Word Guesser 앱이 호출). `{ "variant": "kakao5|kordle6|kordle12", "answer": "<단어>" }`. Word Guesser가 후보 1개로 수렴하거나 정답을 맞히면 그 단어를 보고. `wg_answers(variant, answer, ip_hash, day)` 기록. 검증 실패 400.
+- `GET` **`/api/stats`** — 🔒 관리자. 응답:
+  ```json
+  {
+    "pages":  [{ "page":"word-guesser", "total":123, "today":7, "unique_today":5 }, ...],
+    "wgToday":[{ "variant":"kordle6", "answer":"사람", "n":4, "users":3 }, ...]
+  }
+  ```
+  `total`=누적, `today`=오늘(KST) 접속, `unique_today`=오늘 순방문(distinct ip_hash). `wgToday`=오늘 보고된 정답을 (variant, answer)별 빈도순. "몇 명 오늘 사용"=해당 페이지 `unique_today`, "오늘의 정답"=`wgToday`의 최다 보고 단어.
+
+`day`는 모두 KST(UTC+9) 기준(`date('now','+9 hours')`)이라 한국 자정에 "오늘"이 바뀐다.
+
 ## 4. 데이터 / 검증 / 스팸 규칙
 
 ### 4.1 D1 스키마 (`backend/schema.sql`)

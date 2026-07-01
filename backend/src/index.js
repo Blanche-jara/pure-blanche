@@ -28,6 +28,16 @@ const MESSAGE_MAX = 500;
 const TOO_FAST_SECONDS = 30;
 const DAILY_LIMIT = 20;
 
+// 접속 통계로 추적하는 코드 프로젝트 페이지 슬러그(화이트리스트).
+const TRACKED_PAGES = new Set([
+  "jara-holdem", "roulette", "whos-the-nut", "icm-split", "safe-link",
+  "cannon", "jamakase", "birthday", "word-guesser", "word-finder",
+]);
+// Word Guesser 변형.
+const WG_VARIANTS = new Set(["kakao5", "kordle6", "kordle12"]);
+// KST(UTC+9) 기준 오늘 날짜 SQL 식.
+const KST_TODAY = "date('now','+9 hours')";
+
 // ── CORS ──────────────────────────────────────────────────────────────
 function resolveOrigin(request) {
   const origin = request.headers.get("Origin");
@@ -230,6 +240,80 @@ async function handleUpdate(env, request, id) {
   return json({ message: row }, 200, request);
 }
 
+// ── 통계(접속량 + Word Guesser 정답) ──────────────────────────────────
+// 코드 프로젝트 페이지 접속 1건 기록(공개).
+async function handleHit(env, request) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return errorResponse(400, "invalid_json", "잘못된 요청입니다.", request);
+  }
+  const page = typeof body?.page === "string" ? body.page.trim() : "";
+  if (!TRACKED_PAGES.has(page)) {
+    return errorResponse(400, "bad_page", "알 수 없는 페이지입니다.", request);
+  }
+  const hash = await ipHash(env, request);
+  await env.DB.prepare(
+    `INSERT INTO page_views (page, ip_hash, day) VALUES (?, ?, ${KST_TODAY})`
+  )
+    .bind(page, hash)
+    .run();
+  return json({ ok: true }, 200, request);
+}
+
+// Word Guesser 가 수렴한 정답 보고(공개). variant/answer 검증.
+async function handleWgAnswer(env, request) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return errorResponse(400, "invalid_json", "잘못된 요청입니다.", request);
+  }
+  const variant = typeof body?.variant === "string" ? body.variant.trim() : "";
+  const answer = typeof body?.answer === "string" ? body.answer.trim() : "";
+  if (!WG_VARIANTS.has(variant)) {
+    return errorResponse(400, "bad_variant", "알 수 없는 변형입니다.", request);
+  }
+  if (answer.length === 0 || answer.length > 20) {
+    return errorResponse(400, "bad_answer", "정답 형식이 올바르지 않습니다.", request);
+  }
+  const hash = await ipHash(env, request);
+  await env.DB.prepare(
+    `INSERT INTO wg_answers (variant, answer, ip_hash, day) VALUES (?, ?, ?, ${KST_TODAY})`
+  )
+    .bind(variant, answer, hash)
+    .run();
+  return json({ ok: true }, 200, request);
+}
+
+// 관리자 전용: 접속 통계(페이지별 총/오늘/순방문) + Word Guesser 오늘의 정답 집계.
+async function handleStats(env, request) {
+  if (!isAdmin(env, request)) {
+    return errorResponse(401, "unauthorized", "관리자 인증이 필요합니다.", request);
+  }
+  const pv = await env.DB.prepare(
+    `SELECT page,
+            COUNT(*) AS total,
+            SUM(CASE WHEN day = ${KST_TODAY} THEN 1 ELSE 0 END) AS today,
+            COUNT(DISTINCT CASE WHEN day = ${KST_TODAY} THEN ip_hash END) AS unique_today
+     FROM page_views
+     GROUP BY page`
+  ).all();
+  const wg = await env.DB.prepare(
+    `SELECT variant, answer, COUNT(*) AS n, COUNT(DISTINCT ip_hash) AS users
+     FROM wg_answers
+     WHERE day = ${KST_TODAY}
+     GROUP BY variant, answer
+     ORDER BY n DESC`
+  ).all();
+  return json(
+    { pages: pv.results ?? [], wgToday: wg.results ?? [] },
+    200,
+    request
+  );
+}
+
 // ── 라우터 ────────────────────────────────────────────────────────────
 export default {
   async fetch(request, env) {
@@ -268,6 +352,17 @@ export default {
         const id = Number(idMatch[1]);
         if (request.method === "DELETE") return await handleDelete(env, request, id);
         if (request.method === "PATCH") return await handleUpdate(env, request, id);
+      }
+
+      // 통계
+      if (path === "/api/hit" && request.method === "POST") {
+        return await handleHit(env, request);
+      }
+      if (path === "/api/wg/answer" && request.method === "POST") {
+        return await handleWgAnswer(env, request);
+      }
+      if (path === "/api/stats" && request.method === "GET") {
+        return await handleStats(env, request);
       }
 
       return errorResponse(404, "not_found", "요청하신 경로를 찾을 수 없습니다.", request);
