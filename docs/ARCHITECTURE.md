@@ -34,7 +34,8 @@ Flutter Web 단일 페이지 앱(SPA)으로 만든 **Blanche의 개인 포트폴
 | `/` | `MainPage` | 2-page 세로 스냅: 히어로 + 3 네비카드. 첫 방문 시 인트로 영상 |
 | `/code` | `CodeProjectsPage` | 코드 프로젝트 10개 카드 |
 | `/video` | `VideoProjectsPage` | 영상 연대표 (7개 시대 풀페이지 스냅) |
-| `/guestbook` | `GuestbookPage` | 방명록 (현재 공사중 오버레이 → 백엔드 작업 중) |
+| `/guestbook` | `GuestbookPage` | 방명록 (Cloudflare Workers+D1 연동) |
+| `/admin` | `GuestbookPage(adminEntry:true)` | 숨김 관리자 진입 (비밀번호 → 방명록 관리/접속 통계 탭) |
 | `/app/jara-holdem` | `AppWrapper`+`JaraHoldemApp` | 포커 토너먼트 타이머 (Flutter) |
 | `/app/roulette` | `AppWrapper`+`RouletteAppEntry` | 자마카세 인원뽑기 룰렛 (Flutter) |
 | `/app/whos-the-nut` | `AppWrapper`+`WhosTheNutApp` | 너트 핸드 평가기 (Flutter) |
@@ -63,9 +64,9 @@ pure-blanche/
 │   ├── pages/                 # main / code_projects / video_projects / guestbook
 │   ├── apps/                  # 서브앱 6개(Flutter) + app_wrapper + web_embed
 │   ├── widgets/               # nav_bar, page_scaffold, section_header, youtube_player ...
-│   ├── services/              # (신설 예정) guestbook_service.dart
-│   └── sections/              # ⚠️ 구버전 싱글페이지 잔재 — 삭제 대상
-├── backend/                   # (신설 예정) Cloudflare Worker + D1 (방명록 API)
+│   └── services/              # guestbook_service.dart, stats_service.dart
+├── backend/                   # Cloudflare Worker + D1 (방명록 + 접속통계/WG정답 API)
+├── apps_src/                  # 사전빌드 임베드 앱 소스 (word-guesser) — apps_src/README.md
 ├── web/
 │   ├── index.html, CNAME      # CNAME = pure-blanche.com
 │   └── apps/                  # jamakase / birthday / word-guesser / word-finder / whos-the-nut(정책) ...
@@ -95,8 +96,11 @@ pure-blanche/
 - 데이터는 `VIDEO_SLOTS.md`와 수동 동기화. YouTube `youtube-nocookie.com/embed/{ID}` 임베드.
 
 ### 5.4 GuestbookPage (`lib/pages/guestbook_page.dart`)
-- 현재: 입력 폼 + 메시지 리스트 UI는 있으나 **로컬 state**라 새로고침 시 소멸 + "공사중" 오버레이로 가려둠.
-- **진행 중 작업**: 백엔드 연동으로 영구 저장. 상세 명세는 [GUESTBOOK_BACKEND.md](./GUESTBOOK_BACKEND.md).
+- **Cloudflare Workers + D1 백엔드 연동**(영구 저장). 로딩/목록/에러 3-상태, graceful degradation.
+- **관리자 모드**: 숨김 라우트 `/#/admin` → 비밀번호 → sessionStorage 세션. 탭 2개:
+  - **방명록 관리**: 모든 글 수정/삭제.
+  - **접속 통계**: 코드 프로젝트 페이지별 총/오늘/순방문 + Word Guesser "오늘의 정답"(변형별).
+- 상세 명세(API 계약 포함): [GUESTBOOK_BACKEND.md](./GUESTBOOK_BACKEND.md).
 
 ## 6. 서브앱 요약 (`lib/apps/`)
 
