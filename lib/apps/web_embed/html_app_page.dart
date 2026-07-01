@@ -2,16 +2,21 @@ import 'package:flutter/material.dart';
 import 'dart:ui_web' as ui_web;
 import 'package:web/web.dart' as web;
 import '../../theme/app_colors.dart';
+import '../../services/stats_service.dart';
 
 /// Embeds an HTML page via iframe for web projects (Jamakase, 251228).
 class HtmlAppPage extends StatefulWidget {
   final String title;
   final String htmlPath;
 
+  /// 접속 통계 슬러그(예: 'word-guesser'). null이면 기록 안 함.
+  final String? trackId;
+
   const HtmlAppPage({
     super.key,
     required this.title,
     required this.htmlPath,
+    this.trackId,
   });
 
   @override
@@ -24,6 +29,8 @@ class _HtmlAppPageState extends State<HtmlAppPage> {
   @override
   void initState() {
     super.initState();
+    final id = widget.trackId;
+    if (id != null) StatsService.hit(id);
     _viewType = 'html-app-${widget.htmlPath.hashCode}';
     ui_web.platformViewRegistry.registerViewFactory(
       _viewType,

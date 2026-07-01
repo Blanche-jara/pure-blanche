@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:web/web.dart' as web;
 import '../theme/app_colors.dart';
 import '../services/guestbook_service.dart';
+import '../services/stats_service.dart';
 import '../widgets/page_scaffold.dart';
 
 class GuestbookPage extends StatefulWidget {
@@ -33,6 +34,9 @@ class _GuestbookPageState extends State<GuestbookPage> {
   static const String _adminStorageKey = 'pb_admin_token';
   String? _adminToken;
   bool get _isAdmin => _adminToken != null;
+
+  // 관리자 탭. 0 = 방명록 관리, 1 = 접속 통계.
+  int _adminTab = 0;
 
   @override
   void initState() {
@@ -233,14 +237,15 @@ class _GuestbookPageState extends State<GuestbookPage> {
 
   @override
   Widget build(BuildContext context) {
+    final showStats = _isAdmin && _adminTab == 1;
     return PageScaffold(
       title: 'Guestbook',
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'GUESTBOOK',
-            style: TextStyle(
+          Text(
+            showStats ? 'ANALYTICS' : 'GUESTBOOK',
+            style: const TextStyle(
               fontFamily: 'Segoe UI',
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -250,15 +255,26 @@ class _GuestbookPageState extends State<GuestbookPage> {
           ),
           const SizedBox(height: 12),
           Text(
-            'Leave a Message',
+            showStats ? '접속 통계' : 'Leave a Message',
             style: Theme.of(context).textTheme.displayMedium,
           ),
           if (_isAdmin) ...[
             const SizedBox(height: 16),
             _AdminBar(onExit: _exitAdmin),
+            const SizedBox(height: 20),
+            _AdminTabs(
+              current: _adminTab,
+              onChanged: (i) => setState(() => _adminTab = i),
+            ),
           ],
-          const SizedBox(height: 48),
+          const SizedBox(height: 40),
 
+          if (showStats)
+            _StatsView(
+              adminToken: _adminToken!,
+              onAuthExpired: _handleAdminExpired,
+            )
+          else ...[
           // Input form
           Container(
             padding: const EdgeInsets.all(24),
@@ -313,6 +329,7 @@ class _GuestbookPageState extends State<GuestbookPage> {
 
           // Entries area (3-state)
           _buildEntriesArea(),
+          ],
         ],
       ),
     );
@@ -1109,4 +1126,404 @@ InputDecoration _dialogInput(String hint) {
     ),
     contentPadding: const EdgeInsets.all(14),
   );
+}
+
+/// 관리자 탭 셀렉터(방명록 관리 / 접속 통계).
+class _AdminTabs extends StatelessWidget {
+  final int current;
+  final ValueChanged<int> onChanged;
+  const _AdminTabs({required this.current, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _TabChip(
+          label: '방명록 관리',
+          active: current == 0,
+          onTap: () => onChanged(0),
+        ),
+        const SizedBox(width: 8),
+        _TabChip(
+          label: '접속 통계',
+          active: current == 1,
+          onTap: () => onChanged(1),
+        ),
+      ],
+    );
+  }
+}
+
+class _TabChip extends StatefulWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+  const _TabChip({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  State<_TabChip> createState() => _TabChipState();
+}
+
+class _TabChipState extends State<_TabChip> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = widget.active;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          decoration: BoxDecoration(
+            color: active
+                ? AppColors.signalGreen.withValues(alpha: 0.12)
+                : AppColors.carbon,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: active
+                  ? AppColors.signalGreen
+                  : (_hovered
+                      ? AppColors.signalGreen.withValues(alpha: 0.5)
+                      : AppColors.warmCharcoal),
+            ),
+          ),
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 14,
+              fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              color: active ? AppColors.signalGreen : AppColors.parchment,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 접속 통계 화면(관리자). GET /api/stats 로드 → 페이지별 접속 + WG 오늘의 정답.
+class _StatsView extends StatefulWidget {
+  final String adminToken;
+  final VoidCallback onAuthExpired;
+  const _StatsView({required this.adminToken, required this.onAuthExpired});
+
+  @override
+  State<_StatsView> createState() => _StatsViewState();
+}
+
+class _StatsViewState extends State<_StatsView> {
+  final _service = StatsService();
+  bool _loading = true;
+  String? _error;
+  StatsData? _data;
+
+  // 표시 순서 + 이름(통계에 없는 페이지도 0으로 표시).
+  static const List<List<String>> _pageMeta = [
+    ['jara-holdem', 'Jara Holdem Timer'],
+    ['whos-the-nut', "Who's the Nut?"],
+    ['icm-split', 'ICM Split'],
+    ['cannon', 'THE CANNON'],
+    ['safe-link', "It's Safe Link"],
+    ['roulette', '자마카세 인원뽑기'],
+    ['word-guesser', 'Word Guesser'],
+    ['word-finder', 'Word Finder'],
+    ['jamakase', 'Jamakase Notify'],
+    ['birthday', '자라 생일 선물'],
+  ];
+  static const Map<String, String> _wgVariantName = {
+    'kakao5': '카카오톡 오늘의 단어',
+    'kordle6': '꼬들',
+    'kordle12': '꼬오오오오들',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _service.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final d = await _service.fetch(widget.adminToken);
+      if (!mounted) return;
+      setState(() {
+        _data = d;
+        _loading = false;
+      });
+    } on StatsException catch (e) {
+      if (!mounted) return;
+      if (e.authExpired) {
+        widget.onAuthExpired();
+        return;
+      }
+      setState(() {
+        _error = e.message;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = '통계를 불러오지 못했습니다.';
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 48),
+        child: Center(
+          child: SizedBox(
+            width: 32,
+            height: 32,
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.signalGreen),
+            ),
+          ),
+        ),
+      );
+    }
+    if (_error != null) {
+      return _ErrorCard(message: _error!, onRetry: _load);
+    }
+    final data = _data!;
+    final byPage = {for (final p in data.pages) p.page: p};
+    final wgUsers = byPage['word-guesser']?.uniqueToday ?? 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _wgCard(data.wgToday, wgUsers),
+        const SizedBox(height: 24),
+        _pagesCard(byPage),
+        const SizedBox(height: 16),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: _RetryButton(onTap: _load),
+        ),
+      ],
+    );
+  }
+
+  // Word Guesser 오늘의 정답 카드.
+  Widget _wgCard(List<WgAnswerStat> wgToday, int wgUsers) {
+    final byVariant = <String, List<WgAnswerStat>>{};
+    for (final w in wgToday) {
+      (byVariant[w.variant] ??= []).add(w);
+    }
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.carbon,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.warmCharcoal),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.emoji_events_outlined,
+                  size: 18, color: AppColors.signalGreen),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Word Guesser · 오늘의 정답',
+                  style: TextStyle(
+                    fontFamily: 'Segoe UI',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.snow,
+                  ),
+                ),
+              ),
+              Text(
+                '오늘 $wgUsers명 사용',
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  color: AppColors.steel,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          for (final e in _wgVariantName.entries)
+            _variantRow(e.value, byVariant[e.key] ?? const []),
+        ],
+      ),
+    );
+  }
+
+  Widget _variantRow(String name, List<WgAnswerStat> answers) {
+    final sorted = [...answers]..sort((a, b) => b.n.compareTo(a.n));
+    final top = sorted.isNotEmpty ? sorted.first : null;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 130,
+            child: Text(
+              name,
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 13,
+                color: AppColors.parchment,
+              ),
+            ),
+          ),
+          Expanded(
+            child: top == null
+                ? const Text(
+                    '아직 보고 없음',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 14,
+                      color: AppColors.steel,
+                    ),
+                  )
+                : Row(
+                    children: [
+                      Text(
+                        top.answer,
+                        style: const TextStyle(
+                          fontFamily: 'Segoe UI',
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.signalGreen,
+                        ),
+                      ),
+                      if (sorted.length > 1)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: Text(
+                            '외 ${sorted.length - 1}개',
+                            style: const TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 12,
+                              color: AppColors.steel,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+          if (top != null)
+            Text(
+              '${top.users}명',
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 13,
+                color: AppColors.steel,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // 페이지별 접속 표.
+  Widget _pagesCard(Map<String, PageStat> byPage) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.carbon,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.warmCharcoal),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '코드 프로젝트 접속',
+            style: TextStyle(
+              fontFamily: 'Segoe UI',
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppColors.snow,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            '총 = 누적 · 오늘 = 오늘 접속 · 순 = 오늘 순 방문자',
+            style: TextStyle(
+                fontFamily: 'Inter', fontSize: 12, color: AppColors.steel),
+          ),
+          const SizedBox(height: 12),
+          _statRow('프로젝트', '총', '오늘', '순', header: true),
+          const Divider(color: AppColors.warmCharcoal, height: 16),
+          for (var i = 0; i < _pageMeta.length; i++) ...[
+            if (i > 0) const SizedBox(height: 4),
+            Builder(builder: (_) {
+              final slug = _pageMeta[i][0];
+              final name = _pageMeta[i][1];
+              final s = byPage[slug];
+              return _statRow(
+                name,
+                '${s?.total ?? 0}',
+                '${s?.today ?? 0}',
+                '${s?.uniqueToday ?? 0}',
+              );
+            }),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _statRow(String name, String total, String today, String uniq,
+      {bool header = false}) {
+    final style = TextStyle(
+      fontFamily: 'Inter',
+      fontSize: header ? 12 : 14,
+      fontWeight: header ? FontWeight.w600 : FontWeight.w500,
+      color: header ? AppColors.steel : AppColors.snow,
+    );
+    final numStyle = TextStyle(
+      fontFamily: 'Consolas',
+      fontSize: header ? 12 : 14,
+      color: header ? AppColors.steel : AppColors.parchment,
+    );
+    Widget cell(String t, double w, TextStyle st) => SizedBox(
+          width: w,
+          child: Text(t, textAlign: TextAlign.right, style: st),
+        );
+    return Row(
+      children: [
+        Expanded(
+          child: Text(name,
+              maxLines: 1, overflow: TextOverflow.ellipsis, style: style),
+        ),
+        cell(total, 56, header ? style : numStyle),
+        cell(today, 48, header ? style : numStyle),
+        cell(uniq, 48, header ? style : numStyle),
+      ],
+    );
+  }
 }

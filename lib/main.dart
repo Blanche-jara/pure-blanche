@@ -37,42 +37,52 @@ class PureBlancheApp extends StatelessWidget {
         // Sub-apps
         '/app/jara-holdem': (_) => const AppWrapper(
               title: 'Jara Holdem Timer',
+              trackId: 'jara-holdem',
               child: JaraHoldemApp(),
             ),
         '/app/roulette': (_) => const AppWrapper(
               title: '자마카세 인원뽑기',
+              trackId: 'roulette',
               child: RouletteAppEntry(),
             ),
         '/app/jamakase': (_) => const HtmlAppPage(
               title: 'Jamakase Notify',
+              trackId: 'jamakase',
               htmlPath: 'apps/jamakase/index.html',
             ),
         '/app/birthday': (_) => const HtmlAppPage(
               title: '제 25회 자라 생일 선물 리스트',
+              trackId: 'birthday',
               htmlPath: 'apps/birthday/index.html',
             ),
         '/app/whos-the-nut': (_) => const AppWrapper(
               title: "Who's the Nut?",
+              trackId: 'whos-the-nut',
               child: WhosTheNutApp(),
             ),
         '/app/icm-split': (_) => const AppWrapper(
               title: 'ICM Split',
+              trackId: 'icm-split',
               child: IcmSplitApp(),
             ),
         '/app/safe-link': (_) => const AppWrapper(
               title: "It's Safe Link",
+              trackId: 'safe-link',
               child: SafeLinkApp(),
             ),
         '/app/cannon': (_) => const AppWrapper(
               title: 'THE CANNON',
+              trackId: 'cannon',
               child: CannonApp(),
             ),
         '/app/word-guesser': (_) => const HtmlAppPage(
               title: 'Word Guesser',
+              trackId: 'word-guesser',
               htmlPath: 'apps/word-guesser/index.html',
             ),
         '/app/word-finder': (_) => const HtmlAppPage(
               title: 'Word Finder',
+              trackId: 'word-finder',
               htmlPath: 'apps/word-finder/index.html',
             ),
       },

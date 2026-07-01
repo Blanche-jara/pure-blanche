@@ -1,12 +1,33 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import '../services/stats_service.dart';
 
 /// Wraps a sub-app (jara-holdem, roulette) in a page with a back button bar.
-class AppWrapper extends StatelessWidget {
+class AppWrapper extends StatefulWidget {
   final String title;
   final Widget child;
 
-  const AppWrapper({super.key, required this.title, required this.child});
+  /// 접속 통계 슬러그(예: 'jara-holdem'). null이면 기록 안 함.
+  final String? trackId;
+
+  const AppWrapper({
+    super.key,
+    required this.title,
+    required this.child,
+    this.trackId,
+  });
+
+  @override
+  State<AppWrapper> createState() => _AppWrapperState();
+}
+
+class _AppWrapperState extends State<AppWrapper> {
+  @override
+  void initState() {
+    super.initState();
+    final id = widget.trackId;
+    if (id != null) StatsService.hit(id);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +55,7 @@ class AppWrapper extends StatelessWidget {
                 _BackButton(onTap: () => Navigator.of(context).pop()),
                 const SizedBox(width: 16),
                 Text(
-                  title,
+                  widget.title,
                   style: TextStyle(
                     fontFamily: 'Segoe UI',
                     fontSize: isCompact ? 14 : 18,
@@ -47,7 +68,7 @@ class AppWrapper extends StatelessWidget {
             ),
           ),
           // Sub-app fills remaining space
-          Expanded(child: child),
+          Expanded(child: widget.child),
         ],
       ),
     );
