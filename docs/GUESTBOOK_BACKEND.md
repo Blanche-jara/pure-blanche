@@ -123,8 +123,13 @@ CREATE TABLE IF NOT EXISTS messages (
   name       TEXT NOT NULL,
   message    TEXT NOT NULL,
   ip_hash    TEXT,
+  ip         TEXT,   -- 원본 IP (관리자 전용, v1.3~). 신규 글부터 기록.
+  country    TEXT,   -- Cloudflare 지오 (국가 코드)
+  region     TEXT,   -- 지역/시도
+  city       TEXT,   -- 도시
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+-- 기존 DB는 backend/migrate_ip_geo.sql 로 ip/country/region/city 컬럼을 1회 추가.
 CREATE INDEX IF NOT EXISTS idx_messages_id     ON messages(id DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_iphash ON messages(ip_hash, created_at);
 
@@ -144,7 +149,14 @@ WHERE NOT EXISTS (SELECT 1 FROM messages);
 - **Rate limit (IP 해시 기준)**:
   - 같은 IP 마지막 작성 후 **30초** 미만 → `429 too_fast`.
   - 같은 IP 최근 **24시간** 내 **20개 이상** → `429 daily_limit`.
-- **IP 프라이버시**: 원본 IP는 저장하지 않는다. `ip_hash = SHA-256(IP_SALT + ":" + ip)` (Web Crypto). IP는 `CF-Connecting-IP` 헤더에서 획득. `IP_SALT`는 Worker secret.
+- **IP 해시**: rate-limit·순방문 계산용 `ip_hash = SHA-256(IP_SALT + ":" + ip)` (Web Crypto). `IP_SALT`는 Worker secret.
+
+### 4.4 IP·지역 수집 + 이용 동의 (v1.3)
+방명록 관리 편의를 위해 **작성 시 원본 IP(`CF-Connecting-IP`)와 Cloudflare 지역(`request.cf`의 country/region/city)을 함께 저장**한다.
+- **관리자 전용 노출**: `GET /api/guestbook`는 공개 호출 시 `id/name/message/created_at`만, **관리자 Bearer 동반 시에만** `ip/country/region/city`를 추가로 반환한다. 공개 목록엔 절대 포함되지 않는다.
+- **이용 동의(프론트)**: 비관리자는 `/guestbook` 최초 진입 시 약관("도배·비방 시 관리자가 IP·지역을 수집·확인하고 공개(박제)할 수 있음")에 **동의(체크)해야** 방명록 이용 가능. 동의는 `localStorage(pb_guestbook_consent)`에 저장(브라우저당 1회).
+- 소급 안 됨: 이 기능 이전 글은 ip/지역이 비어 있다(관리자 화면에 "미기록" 표시).
+- 지역은 IP 기반이라 대략적이며 `request.cf`는 프로덕션에서만 채워진다(로컬 `wrangler dev`는 비어 있을 수 있음).
 
 ## 5. 백엔드 리포 레이아웃 (c1 담당)
 

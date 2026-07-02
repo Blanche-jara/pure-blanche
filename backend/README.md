@@ -133,3 +133,12 @@ curl https://api.pure-blanche.com/api/guestbook
 - **시크릿 교체**: `npx wrangler secret put ADMIN_TOKEN` 재실행 → 라이브 워커에 즉시 반영(코드 재배포 불필요).
 - `ADMIN_TOKEN` 미설정 시 관리자 기능은 완전 비활성(모든 관리자 요청 `401`).
 - 관리자 수정(`PATCH`)은 신뢰 주체로 간주하여 링크/스팸 필터를 적용하지 않는다.
+
+### 방명록 IP·지역 수집 (v1.3)
+- 작성 시 원본 IP + Cloudflare 지역(국가/지역/도시)을 저장하고, **관리자 목록 조회(Bearer)에서만** 노출한다. 공개 목록엔 안 나감.
+- 비관리자는 `/guestbook` 최초 진입 시 이용 약관(도배 시 IP·지역 수집·공개 가능)에 동의해야 이용 가능.
+- **기존 DB 마이그레이션(1회)** — messages 테이블에 컬럼 추가:
+  ```bash
+  npx wrangler d1 execute pure-blanche-guestbook --remote --file=./migrate_ip_geo.sql
+  ```
+  (신규 DB는 `schema.sql` 에 이미 포함. 이 마이그레이션은 재실행 시 "duplicate column" 에러 → 1회만.)

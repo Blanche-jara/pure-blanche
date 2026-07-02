@@ -3,6 +3,10 @@ CREATE TABLE IF NOT EXISTS messages (
   name       TEXT NOT NULL,
   message    TEXT NOT NULL,
   ip_hash    TEXT,
+  ip         TEXT,   -- 원본 IP (관리자 전용). 신규 글부터 기록.
+  country    TEXT,   -- Cloudflare 지오 (국가 코드)
+  region     TEXT,   -- 지역/시도
+  city       TEXT,   -- 도시
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_messages_id     ON messages(id DESC);

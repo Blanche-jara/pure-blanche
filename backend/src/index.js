@@ -106,8 +106,13 @@ function isAdmin(env, request) {
 
 // ── 핸들러 ────────────────────────────────────────────────────────────
 async function handleList(env, request) {
+  // 공개 목록은 id/name/message/created_at 만. 관리자(Bearer)는 ip/지역까지.
+  const admin = isAdmin(env, request);
+  const cols = admin
+    ? "id, name, message, created_at, ip, country, region, city"
+    : "id, name, message, created_at";
   const { results } = await env.DB.prepare(
-    "SELECT id, name, message, created_at FROM messages ORDER BY id DESC LIMIT 100"
+    `SELECT ${cols} FROM messages ORDER BY id DESC LIMIT 100`
   ).all();
   return json({ messages: results ?? [] }, 200, request);
 }
@@ -164,11 +169,17 @@ async function handleCreate(env, request) {
     return errorResponse(429, "daily_limit", "하루 작성 한도를 초과했습니다.", request);
   }
 
-  // 5) 저장 + 생성 객체 반환 (원본 IP 미저장 — ip_hash만)
+  // 5) 저장. 원본 IP + Cloudflare 지역(국가/지역/도시)을 관리자 조회용으로 함께 보관.
+  //    (공개 목록 API 는 이 필드를 절대 반환하지 않는다 — handleList 참고)
+  const ip = request.headers.get("CF-Connecting-IP") || null;
+  const cf = request.cf || {};
+  const country = request.headers.get("CF-IPCountry") || cf.country || null;
+  const region = cf.region || cf.regionCode || null;
+  const city = cf.city || null;
   const row = await env.DB.prepare(
-    "INSERT INTO messages (name, message, ip_hash) VALUES (?, ?, ?) RETURNING id, name, message, created_at"
+    "INSERT INTO messages (name, message, ip_hash, ip, country, region, city) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id, name, message, created_at"
   )
-    .bind(name, message, hash)
+    .bind(name, message, hash, ip, country, region, city)
     .first();
 
   return json({ message: row }, 201, request);

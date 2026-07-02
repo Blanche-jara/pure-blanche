@@ -23,10 +23,13 @@ class GuestbookService {
   final http.Client _client;
 
   /// 최신 방명록 목록(최신순). GET /api/guestbook
-  Future<List<GuestEntry>> fetchEntries() async {
+  /// [adminToken] 을 주면 Bearer 로 요청 → 응답에 ip/지역 필드가 포함된다(관리자).
+  Future<List<GuestEntry>> fetchEntries({String? adminToken}) async {
     final uri = Uri.parse('$baseUrl/api/guestbook');
     try {
-      final res = await _client.get(uri).timeout(_timeout);
+      final headers =
+          adminToken != null ? {'Authorization': 'Bearer $adminToken'} : null;
+      final res = await _client.get(uri, headers: headers).timeout(_timeout);
       if (res.statusCode != 200) {
         throw GuestbookException(_detailFromBody(res.bodyBytes) ??
             '방명록을 불러오지 못했습니다. (${res.statusCode})');
@@ -195,6 +198,10 @@ class GuestEntry {
     required this.name,
     required this.message,
     required this.createdAt,
+    this.ip,
+    this.country,
+    this.region,
+    this.city,
   });
 
   final int id;
@@ -204,13 +211,37 @@ class GuestEntry {
   /// 로컬 시간대로 변환된 작성 시각.
   final DateTime createdAt;
 
+  // 관리자 조회 시에만 채워짐(공개 응답엔 없음). null 가능.
+  final String? ip;
+  final String? country;
+  final String? region;
+  final String? city;
+
   factory GuestEntry.fromJson(Map<String, dynamic> json) {
+    String? s(dynamic v) {
+      if (v == null) return null;
+      final t = v.toString().trim();
+      return t.isEmpty ? null : t;
+    }
+
     return GuestEntry(
       id: (json['id'] as num?)?.toInt() ?? 0,
       name: (json['name'] as String?) ?? '',
       message: (json['message'] as String?) ?? '',
       createdAt: _parseCreatedAt(json['created_at'] as String?),
+      ip: s(json['ip']),
+      country: s(json['country']),
+      region: s(json['region']),
+      city: s(json['city']),
     );
+  }
+
+  /// 국가/지역/도시를 " · " 로 합친 표시 문자열. 정보 없으면 null.
+  String? get locationLabel {
+    final parts = [country, region, city]
+        .where((e) => e != null && e.isNotEmpty)
+        .toList();
+    return parts.isEmpty ? null : parts.join(' · ');
   }
 
   /// `created_at`은 UTC "YYYY-MM-DD HH:MM:SS". 'T' 구분자 + 'Z'를 붙여

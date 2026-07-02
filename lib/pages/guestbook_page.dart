@@ -38,10 +38,15 @@ class _GuestbookPageState extends State<GuestbookPage> {
   // 관리자 탭. 0 = 방명록 관리, 1 = 접속 통계.
   int _adminTab = 0;
 
+  // 이용 약관 동의(localStorage 영구). 비관리자는 동의해야 방명록 이용 가능.
+  static const String _consentKey = 'pb_guestbook_consent';
+  bool _consented = false;
+
   @override
   void initState() {
     super.initState();
     _restoreAdmin();
+    _consented = _readConsent();
     _loadEntries();
     // 숨김 URL(#/admin) 진입 시, 아직 인증 전이면 비밀번호 프롬프트.
     if (!_isAdmin && (widget.adminEntry || _adminRequestedFromUrl())) {
@@ -65,7 +70,7 @@ class _GuestbookPageState extends State<GuestbookPage> {
       _loadError = null;
     });
     try {
-      final entries = await _service.fetchEntries();
+      final entries = await _service.fetchEntries(adminToken: _adminToken);
       if (!mounted) return;
       setState(() {
         _entries = entries;
@@ -138,6 +143,21 @@ class _GuestbookPageState extends State<GuestbookPage> {
     }
   }
 
+  bool _readConsent() {
+    try {
+      return web.window.localStorage.getItem(_consentKey) == '1';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void _giveConsent() {
+    try {
+      web.window.localStorage.setItem(_consentKey, '1');
+    } catch (_) {}
+    setState(() => _consented = true);
+  }
+
   void _saveAdmin(String token) {
     _adminToken = token;
     try {
@@ -146,10 +166,14 @@ class _GuestbookPageState extends State<GuestbookPage> {
   }
 
   void _exitAdmin() {
-    setState(() => _adminToken = null);
+    setState(() {
+      _adminToken = null;
+      _adminTab = 0;
+    });
     try {
       web.window.sessionStorage.removeItem(_adminStorageKey);
     } catch (_) {}
+    _loadEntries(); // 공개 조회로 재요청 → ip/지역 제거
   }
 
   /// 관리자 토큰 만료(401) 공통 처리: 안내 + 관리자 모드 해제.
@@ -170,6 +194,7 @@ class _GuestbookPageState extends State<GuestbookPage> {
     controller.dispose();
     if (token != null && token.isNotEmpty && mounted) {
       setState(() => _saveAdmin(token));
+      _loadEntries(); // 관리자 토큰으로 재요청 → ip/지역 포함
     }
   }
 
@@ -238,6 +263,7 @@ class _GuestbookPageState extends State<GuestbookPage> {
   @override
   Widget build(BuildContext context) {
     final showStats = _isAdmin && _adminTab == 1;
+    final needConsent = !_isAdmin && !_consented;
     return PageScaffold(
       title: 'Guestbook',
       body: Column(
@@ -255,7 +281,9 @@ class _GuestbookPageState extends State<GuestbookPage> {
           ),
           const SizedBox(height: 12),
           Text(
-            showStats ? '접속 통계' : 'Leave a Message',
+            showStats
+                ? '접속 통계'
+                : (needConsent ? '방명록 이용 안내' : 'Leave a Message'),
             style: Theme.of(context).textTheme.displayMedium,
           ),
           if (_isAdmin) ...[
@@ -269,7 +297,9 @@ class _GuestbookPageState extends State<GuestbookPage> {
           ],
           const SizedBox(height: 40),
 
-          if (showStats)
+          if (needConsent)
+            _ConsentGate(onAgree: _giveConsent)
+          else if (showStats)
             _StatsView(
               adminToken: _adminToken!,
               onAuthExpired: _handleAdminExpired,
@@ -425,7 +455,9 @@ class _GuestbookPageState extends State<GuestbookPage> {
                   ),
                 ),
                 if (_isAdmin) ...[
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
+                  _AdminMetaLine(entry: entry),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       _AdminAction(
@@ -1525,6 +1557,198 @@ class _StatsViewState extends State<_StatsView> {
         cell(today, 48, header ? style : numStyle),
         cell(uniq, 48, header ? style : numStyle),
       ],
+    );
+  }
+}
+
+/// 관리자 전용: 방명록 항목의 IP·지역 표시(공개 화면엔 없음).
+class _AdminMetaLine extends StatelessWidget {
+  final GuestEntry entry;
+  const _AdminMetaLine({required this.entry});
+
+  @override
+  Widget build(BuildContext context) {
+    final parts = <String>[];
+    if (entry.ip != null) parts.add(entry.ip!);
+    final loc = entry.locationLabel;
+    if (loc != null) parts.add(loc);
+    final hasInfo = parts.isNotEmpty;
+    final text = hasInfo ? parts.join('   ·   ') : 'IP·지역 미기록 (수집 이전 글)';
+    return Row(
+      children: [
+        const Icon(Icons.public, size: 13, color: AppColors.steel),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontFamily: 'Consolas',
+              fontSize: 12,
+              color: hasInfo ? AppColors.steel : AppColors.warmCharcoal,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 방명록 이용 약관 동의 게이트. 동의(체크) 후 [onAgree] 호출.
+class _ConsentGate extends StatefulWidget {
+  final VoidCallback onAgree;
+  const _ConsentGate({required this.onAgree});
+
+  @override
+  State<_ConsentGate> createState() => _ConsentGateState();
+}
+
+class _ConsentGateState extends State<_ConsentGate> {
+  bool _checked = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.carbon,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.warmCharcoal),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.info_outline, size: 18, color: AppColors.signalGreen),
+              SizedBox(width: 8),
+              Text(
+                '방명록 이용 전 확인해주세요',
+                style: TextStyle(
+                  fontFamily: 'Segoe UI',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.snow,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _bullet('누구나 자유롭게 방명록을 남길 수 있습니다.'),
+          _bullet(
+              '다만 도배·비방 등 다른 이용자에게 불편을 주는 글을 작성할 경우, 관리자가 해당 글의 IP와 접속 지역을 수집·확인할 수 있으며, 이를 공개적으로 게시(박제)할 수 있습니다.'),
+          _bullet('아래에 동의하셔야 방명록을 이용할 수 있습니다.'),
+          const SizedBox(height: 18),
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () => setState(() => _checked = !_checked),
+              child: Row(
+                children: [
+                  Icon(
+                    _checked
+                        ? Icons.check_box
+                        : Icons.check_box_outline_blank,
+                    size: 20,
+                    color: _checked ? AppColors.signalGreen : AppColors.steel,
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      '위 내용을 이해했으며 이에 동의합니다.',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 14,
+                        color: AppColors.parchment,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Align(
+            alignment: Alignment.centerRight,
+            child: _EnterButton(enabled: _checked, onTap: widget.onAgree),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _bullet(String t) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '· ',
+              style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 14,
+                  height: 1.6,
+                  color: AppColors.steel),
+            ),
+            Expanded(
+              child: Text(
+                t,
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 14,
+                  height: 1.6,
+                  color: AppColors.parchment,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+class _EnterButton extends StatefulWidget {
+  final bool enabled;
+  final VoidCallback onTap;
+  const _EnterButton({required this.enabled, required this.onTap});
+
+  @override
+  State<_EnterButton> createState() => _EnterButtonState();
+}
+
+class _EnterButtonState extends State<_EnterButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.enabled;
+    final accent = _hovered ? AppColors.signalGreen : AppColors.mint;
+    return MouseRegion(
+      cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: enabled ? widget.onTap : null,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppColors.carbon,
+            border: Border.all(
+              color: enabled ? accent : AppColors.warmCharcoal,
+            ),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            '동의하고 입장',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: enabled ? accent : AppColors.steel,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
