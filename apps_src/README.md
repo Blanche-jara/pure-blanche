@@ -6,7 +6,7 @@
 ## word-guesser — 한글 워들 "필승법" 솔버
 
 - 진입: 메인 앱 라우트 `/#/app/word-guesser` → `HtmlAppPage`가 `web/apps/word-guesser/`(사전빌드 번들)를 iframe 임베드.
-- 변형 3종: `kakao5`(카카오톡 오늘의 단어·5자모) / `kordle6`(꼬들·6자모) / `kordle12`(꼬오오오오들·12자모).
+- 변형 4종: `kakao5`(카카오톡 오늘의 단어·5자모) / `kakao7`(카카오톡 오늘의 챌린지·7자모) / `kordle6`(꼬들·6자모) / `kordle12`(꼬오오오오들·12자모).
 - 외부 게임의 색 결과를 입력하면 엔트로피로 후보를 좁히는 **솔버**(정답을 자체 생성하지 않음).
 - **오늘의 정답 보고**: 후보가 1개로 수렴하거나 정답을 맞히면 세션당 1회 `POST /api/wg/answer {variant, answer}` (`lib/report.dart`). 관리자 통계 탭이 이걸 집계해 "오늘의 정답"으로 표시.
 

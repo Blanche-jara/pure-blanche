@@ -102,7 +102,7 @@ Cloudflare D1 (SQLite, 무료)         ← 방명록 메시지 영구 저장
 코드 프로젝트 페이지 접속량과 Word Guesser "오늘의 정답"을 관리자 탭에서 본다.
 
 - `POST` **`/api/hit`** — 공개. `{ "page": "<슬러그>" }`. 슬러그 화이트리스트(10개): jara-holdem/roulette/whos-the-nut/icm-split/safe-link/cannon/jamakase/birthday/word-guesser/word-finder. 화이트리스트 외 → 400 `bad_page`. `page_views(page, ip_hash, day)` 1행 기록(`day`=KST 날짜). 메인 앱의 `AppWrapper`/`HtmlAppPage` 진입 시 호출.
-- `POST` **`/api/wg/answer`** — 공개(Word Guesser 앱이 호출). `{ "variant": "kakao5|kordle6|kordle12", "answer": "<단어>" }`. Word Guesser가 후보 1개로 수렴하거나 정답을 맞히면 그 단어를 보고. `wg_answers(variant, answer, ip_hash, day)` 기록. 검증 실패 400.
+- `POST` **`/api/wg/answer`** — 공개(Word Guesser 앱이 호출). `{ "variant": "kakao5|kakao7|kordle6|kordle12", "answer": "<단어>" }`. Word Guesser가 후보 1개로 수렴하거나 정답을 맞히면 그 단어를 보고. `wg_answers(variant, answer, ip_hash, day)` 기록. 검증 실패 400.
 - `GET` **`/api/stats`** — 🔒 관리자. 응답:
   ```json
   {

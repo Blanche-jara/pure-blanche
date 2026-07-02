@@ -59,6 +59,15 @@ const List<GameVariant> kVariants = [
     slug: 'kakao5',
   ),
   GameVariant(
+    tabLabel: '오늘의 챌린지',
+    fullTitle: '카카오톡 오늘의 챌린지 · 7자모',
+    wordLen: 7,
+    maxGuesses: 7,
+    answersAsset: 'assets/kakao7_answers.txt',
+    guessesAsset: 'assets/kakao7_guesses.txt',
+    slug: 'kakao7',
+  ),
+  GameVariant(
     tabLabel: '꼬들',
     fullTitle: '꼬들 · 6자모',
     wordLen: 6,

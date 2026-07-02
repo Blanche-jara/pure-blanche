@@ -1242,6 +1242,7 @@ class _StatsViewState extends State<_StatsView> {
   ];
   static const Map<String, String> _wgVariantName = {
     'kakao5': '카카오톡 오늘의 단어',
+    'kakao7': '카카오톡 오늘의 챌린지',
     'kordle6': '꼬들',
     'kordle12': '꼬오오오오들',
   };

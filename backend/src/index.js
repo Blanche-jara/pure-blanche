@@ -34,7 +34,7 @@ const TRACKED_PAGES = new Set([
   "cannon", "jamakase", "birthday", "word-guesser", "word-finder",
 ]);
 // Word Guesser 변형.
-const WG_VARIANTS = new Set(["kakao5", "kordle6", "kordle12"]);
+const WG_VARIANTS = new Set(["kakao5", "kakao7", "kordle6", "kordle12"]);
 // KST(UTC+9) 기준 오늘 날짜 SQL 식.
 const KST_TODAY = "date('now','+9 hours')";
 
