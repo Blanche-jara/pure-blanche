@@ -137,8 +137,10 @@ curl https://api.pure-blanche.com/api/guestbook
 ### 방명록 IP·지역 수집 (v1.3)
 - 작성 시 원본 IP + Cloudflare 지역(국가/지역/도시)을 저장하고, **관리자 목록 조회(Bearer)에서만** 노출한다. 공개 목록엔 안 나감.
 - 비관리자는 `/guestbook` 최초 진입 시 이용 약관(도배 시 IP·지역 수집·공개 가능)에 동의해야 이용 가능.
-- **기존 DB 마이그레이션(1회)** — messages 테이블에 컬럼 추가:
+- **기존 DB 마이그레이션(각 1회)** — messages 테이블에 컬럼 추가:
   ```bash
-  npx wrangler d1 execute pure-blanche-guestbook --remote --file=./migrate_ip_geo.sql
+  npx wrangler d1 execute pure-blanche-guestbook --remote --file=./migrate_ip_geo.sql      # ip/country/region/city
+  npx wrangler d1 execute pure-blanche-guestbook --remote --file=./migrate_geo_detail.sql  # latitude/longitude/postal/isp
   ```
-  (신규 DB는 `schema.sql` 에 이미 포함. 이 마이그레이션은 재실행 시 "duplicate column" 에러 → 1회만.)
+  (신규 DB는 `schema.sql` 에 이미 포함. 재실행 시 "duplicate column" 에러 → 각 1회만.)
+- v1.4: 관리자 카드에 ISP·우편번호 + 🗺️ 지도 링크(위경도 기반 구글맵). 정밀도는 도시/ISP 수준.

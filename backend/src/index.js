@@ -109,7 +109,7 @@ async function handleList(env, request) {
   // 공개 목록은 id/name/message/created_at 만. 관리자(Bearer)는 ip/지역까지.
   const admin = isAdmin(env, request);
   const cols = admin
-    ? "id, name, message, created_at, ip, country, region, city"
+    ? "id, name, message, created_at, ip, country, region, city, latitude, longitude, postal, isp"
     : "id, name, message, created_at";
   const { results } = await env.DB.prepare(
     `SELECT ${cols} FROM messages ORDER BY id DESC LIMIT 100`
@@ -176,10 +176,14 @@ async function handleCreate(env, request) {
   const country = request.headers.get("CF-IPCountry") || cf.country || null;
   const region = cf.region || cf.regionCode || null;
   const city = cf.city || null;
+  const lat = cf.latitude || null;
+  const lng = cf.longitude || null;
+  const postal = cf.postalCode || null;
+  const isp = cf.asOrganization || null;
   const row = await env.DB.prepare(
-    "INSERT INTO messages (name, message, ip_hash, ip, country, region, city) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id, name, message, created_at"
+    "INSERT INTO messages (name, message, ip_hash, ip, country, region, city, latitude, longitude, postal, isp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, name, message, created_at"
   )
-    .bind(name, message, hash, ip, country, region, city)
+    .bind(name, message, hash, ip, country, region, city, lat, lng, postal, isp)
     .first();
 
   return json({ message: row }, 201, request);

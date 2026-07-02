@@ -1568,27 +1568,114 @@ class _AdminMetaLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final parts = <String>[];
-    if (entry.ip != null) parts.add(entry.ip!);
+    final ip = entry.ip;
+    final locParts = <String>[];
     final loc = entry.locationLabel;
-    if (loc != null) parts.add(loc);
-    final hasInfo = parts.isNotEmpty;
-    final text = hasInfo ? parts.join('   ·   ') : 'IP·지역 미기록 (수집 이전 글)';
-    return Row(
-      children: [
-        const Icon(Icons.public, size: 13, color: AppColors.steel),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            text,
+    if (loc != null) locParts.add(loc);
+    if (entry.postal != null) locParts.add(entry.postal!);
+    if (entry.isp != null) locParts.add(entry.isp!);
+    final locText = locParts.join('  ·  ');
+    final mapUrl = entry.mapUrl;
+
+    if (ip == null && locText.isEmpty) {
+      return const Row(
+        children: [
+          Icon(Icons.public, size: 13, color: AppColors.warmCharcoal),
+          SizedBox(width: 6),
+          Text(
+            'IP·지역 미기록 (수집 이전 글)',
             style: TextStyle(
-              fontFamily: 'Consolas',
-              fontSize: 12,
-              color: hasInfo ? AppColors.steel : AppColors.warmCharcoal,
-            ),
+                fontFamily: 'Consolas',
+                fontSize: 12,
+                color: AppColors.warmCharcoal),
           ),
-        ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (ip != null)
+          Row(
+            children: [
+              const Icon(Icons.public, size: 13, color: AppColors.steel),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  ip,
+                  style: const TextStyle(
+                      fontFamily: 'Consolas',
+                      fontSize: 12,
+                      color: AppColors.steel),
+                ),
+              ),
+            ],
+          ),
+        if (locText.isNotEmpty || mapUrl != null) ...[
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Icon(Icons.place_outlined,
+                  size: 13, color: AppColors.steel),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  locText.isEmpty ? '위치 정보 없음' : locText,
+                  style: const TextStyle(
+                      fontFamily: 'Inter', fontSize: 12, color: AppColors.steel),
+                ),
+              ),
+              if (mapUrl != null) ...[
+                const SizedBox(width: 8),
+                _MapLink(url: mapUrl),
+              ],
+            ],
+          ),
+        ],
       ],
+    );
+  }
+}
+
+/// 관리자 카드의 "지도" 링크. 클릭 시 새 탭으로 구글맵 열기.
+class _MapLink extends StatefulWidget {
+  final String url;
+  const _MapLink({required this.url});
+
+  @override
+  State<_MapLink> createState() => _MapLinkState();
+}
+
+class _MapLinkState extends State<_MapLink> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _hovered ? AppColors.signalGreen : AppColors.mint;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: () => web.window.open(widget.url, '_blank'),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.map_outlined, size: 13, color: c),
+            const SizedBox(width: 3),
+            Text(
+              '지도',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: c,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

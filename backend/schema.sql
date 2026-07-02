@@ -7,6 +7,10 @@ CREATE TABLE IF NOT EXISTS messages (
   country    TEXT,   -- Cloudflare 지오 (국가 코드)
   region     TEXT,   -- 지역/시도
   city       TEXT,   -- 도시
+  latitude   TEXT,   -- 위도(도시 근사) — 지도 링크용
+  longitude  TEXT,   -- 경도(도시 근사)
+  postal     TEXT,   -- 우편번호
+  isp        TEXT,   -- ISP/기관 (cf.asOrganization)
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_messages_id     ON messages(id DESC);

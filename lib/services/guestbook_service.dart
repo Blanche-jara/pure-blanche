@@ -202,6 +202,10 @@ class GuestEntry {
     this.country,
     this.region,
     this.city,
+    this.latitude,
+    this.longitude,
+    this.postal,
+    this.isp,
   });
 
   final int id;
@@ -216,6 +220,10 @@ class GuestEntry {
   final String? country;
   final String? region;
   final String? city;
+  final String? latitude;
+  final String? longitude;
+  final String? postal;
+  final String? isp;
 
   factory GuestEntry.fromJson(Map<String, dynamic> json) {
     String? s(dynamic v) {
@@ -233,6 +241,10 @@ class GuestEntry {
       country: s(json['country']),
       region: s(json['region']),
       city: s(json['city']),
+      latitude: s(json['latitude']),
+      longitude: s(json['longitude']),
+      postal: s(json['postal']),
+      isp: s(json['isp']),
     );
   }
 
@@ -242,6 +254,19 @@ class GuestEntry {
         .where((e) => e != null && e.isNotEmpty)
         .toList();
     return parts.isEmpty ? null : parts.join(' · ');
+  }
+
+  /// 구글맵 URL. 위경도가 있으면 좌표로, 없으면 지역명 검색으로. 정보 없으면 null.
+  String? get mapUrl {
+    if (latitude != null && longitude != null) {
+      return 'https://www.google.com/maps?q=$latitude,$longitude';
+    }
+    final q = locationLabel;
+    if (q != null) {
+      final query = Uri.encodeComponent(q.replaceAll(' · ', ' '));
+      return 'https://www.google.com/maps/search/?api=1&query=$query';
+    }
+    return null;
   }
 
   /// `created_at`은 UTC "YYYY-MM-DD HH:MM:SS". 'T' 구분자 + 'Z'를 붙여

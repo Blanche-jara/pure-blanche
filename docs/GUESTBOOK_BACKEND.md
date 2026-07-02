@@ -127,9 +127,13 @@ CREATE TABLE IF NOT EXISTS messages (
   country    TEXT,   -- Cloudflare 지오 (국가 코드)
   region     TEXT,   -- 지역/시도
   city       TEXT,   -- 도시
+  latitude   TEXT,   -- 위도(도시 근사, v1.4~) — 지도 링크용
+  longitude  TEXT,   -- 경도(도시 근사)
+  postal     TEXT,   -- 우편번호
+  isp        TEXT,   -- ISP/기관 (cf.asOrganization)
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
--- 기존 DB는 backend/migrate_ip_geo.sql 로 ip/country/region/city 컬럼을 1회 추가.
+-- 기존 DB 마이그레이션(각 1회): migrate_ip_geo.sql(ip/country/region/city) → migrate_geo_detail.sql(latitude/longitude/postal/isp).
 CREATE INDEX IF NOT EXISTS idx_messages_id     ON messages(id DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_iphash ON messages(ip_hash, created_at);
 
@@ -157,6 +161,7 @@ WHERE NOT EXISTS (SELECT 1 FROM messages);
 - **이용 동의(프론트)**: 비관리자는 `/guestbook` 최초 진입 시 약관("도배·비방 시 관리자가 IP·지역을 수집·확인하고 공개(박제)할 수 있음")에 **동의(체크)해야** 방명록 이용 가능. 동의는 `localStorage(pb_guestbook_consent)`에 저장(브라우저당 1회).
 - 소급 안 됨: 이 기능 이전 글은 ip/지역이 비어 있다(관리자 화면에 "미기록" 표시).
 - 지역은 IP 기반이라 대략적이며 `request.cf`는 프로덕션에서만 채워진다(로컬 `wrangler dev`는 비어 있을 수 있음).
+- **v1.4**: `request.cf`의 `latitude`/`longitude`/`postalCode`/`asOrganization(ISP)`도 저장. 관리자 카드에 ISP·우편번호 표시 + **🗺️ 지도** 링크(위경도 → 구글맵, 없으면 지역명 검색). 정밀도는 도시/ISP 수준(정확 주소 아님). IPv6 주소는 정상(한국 통신사 다수가 IPv6).
 
 ## 5. 백엔드 리포 레이아웃 (c1 담당)
 
