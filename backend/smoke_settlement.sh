@@ -1,6 +1,11 @@
 #!/bin/bash
-# 정산표 API 인수 기준 스모크 테스트 (docs/SETTLEMENT_BACKEND.md 7장)
-API=http://localhost:8787
+# SMTM(정산표) API 인수 기준 스모크 테스트 (docs/SETTLEMENT_BACKEND.md 7장)
+#
+#   bash backend/smoke_settlement.sh                          # 로컬 wrangler dev
+#   API=https://api.pure-blanche.com bash backend/...          # 배포 확인
+#
+# 만든 정산표는 마지막에 소유자 토큰으로 지운다(프로덕션에 찌꺼기를 남기지 않는다).
+API=${API:-http://localhost:8787}
 pass=0; fail=0
 check() { # check <설명> <실제> <기대>
   if [ "$2" = "$3" ]; then echo "  ✅ $1"; pass=$((pass+1));
