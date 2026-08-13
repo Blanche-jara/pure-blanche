@@ -4,19 +4,19 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
+import 'controller.dart';
 import 'dialogs.dart';
 import 'engine.dart';
 import 'models.dart';
-import 'store.dart';
 import 'ui_kit.dart';
 
 class ExpensesTab extends StatelessWidget {
-  final SettlementStore store;
+  final SettlementController controller;
   final SettlementProject project;
 
   const ExpensesTab({
     super.key,
-    required this.store,
+    required this.controller,
     required this.project,
   });
 
@@ -37,7 +37,7 @@ class ExpensesTab extends StatelessWidget {
             dense: true,
             onTap: () => showExpenseDialog(
               context: context,
-              store: store,
+              controller: controller,
               project: project,
             ),
           ),
@@ -53,7 +53,7 @@ class ExpensesTab extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: _ExpenseRow(
-                store: store,
+                controller: controller,
                 project: project,
                 expense: e,
               ),
@@ -68,7 +68,7 @@ class ExpensesTab extends StatelessWidget {
             dense: true,
             onTap: () => showTransferDialog(
               context: context,
-              store: store,
+              controller: controller,
               project: project,
             ),
           ),
@@ -84,7 +84,7 @@ class ExpensesTab extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: _TransferRow(
-                store: store,
+                controller: controller,
                 project: project,
                 transfer: t,
               ),
@@ -95,12 +95,12 @@ class ExpensesTab extends StatelessWidget {
 }
 
 class _ExpenseRow extends StatelessWidget {
-  final SettlementStore store;
+  final SettlementController controller;
   final SettlementProject project;
   final Expense expense;
 
   const _ExpenseRow({
-    required this.store,
+    required this.controller,
     required this.project,
     required this.expense,
   });
@@ -192,7 +192,7 @@ class _ExpenseRow extends StatelessWidget {
                         tooltip: '수정',
                         onTap: () => showExpenseDialog(
                           context: context,
-                          store: store,
+                          controller: controller,
                           project: project,
                           existing: expense,
                         ),
@@ -209,7 +209,7 @@ class _ExpenseRow extends StatelessWidget {
                                 '"${expense.title}" (${formatWonUnit(expense.amount)}) 을(를) 삭제한다. '
                                 '이 지출에서 만들어진 채무와 정산 표시도 함께 사라진다.',
                           );
-                          if (ok) store.removeExpense(project.id, expense.id);
+                          if (ok) controller.removeExpense(expense.id);
                         },
                       ),
                     ],
@@ -312,12 +312,12 @@ class _ShareChip extends StatelessWidget {
 }
 
 class _TransferRow extends StatelessWidget {
-  final SettlementStore store;
+  final SettlementController controller;
   final SettlementProject project;
   final Transfer transfer;
 
   const _TransferRow({
-    required this.store,
+    required this.controller,
     required this.project,
     required this.transfer,
   });
@@ -385,7 +385,7 @@ class _TransferRow extends StatelessWidget {
             icon: Icons.delete_outline,
             tooltip: '삭제',
             color: AppColors.danger,
-            onTap: () => store.removeTransfer(project.id, transfer.id),
+            onTap: () => controller.removeTransfer(transfer.id),
           ),
         ],
       ),

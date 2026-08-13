@@ -4,20 +4,20 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
+import 'controller.dart';
 import 'dialogs.dart';
 import 'engine.dart';
 import 'models.dart';
-import 'store.dart';
 import 'ui_kit.dart';
 
 class OverviewTab extends StatelessWidget {
-  final SettlementStore store;
+  final SettlementController controller;
   final SettlementProject project;
   final ValueChanged<String> onOpenMember;
 
   const OverviewTab({
     super.key,
-    required this.store,
+    required this.controller,
     required this.project,
     required this.onOpenMember,
   });
@@ -40,7 +40,7 @@ class OverviewTab extends StatelessWidget {
             dense: true,
             onTap: () => showTransferDialog(
               context: context,
-              store: store,
+              controller: controller,
               project: project,
             ),
           ),
@@ -80,7 +80,7 @@ class OverviewTab extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: _FlowRow(
-                store: store,
+                controller: controller,
                 project: project,
                 flow: f,
                 wide: wide,
@@ -109,13 +109,13 @@ class OverviewTab extends StatelessWidget {
 }
 
 class _FlowRow extends StatelessWidget {
-  final SettlementStore store;
+  final SettlementController controller;
   final SettlementProject project;
   final PairFlow flow;
   final bool wide;
 
   const _FlowRow({
-    required this.store,
+    required this.controller,
     required this.project,
     required this.flow,
     required this.wide,
@@ -238,7 +238,7 @@ class _FlowRow extends StatelessWidget {
                 dense: true,
                 onTap: () => showTransferDialog(
                   context: context,
-                  store: store,
+                  controller: controller,
                   project: project,
                   fromId: flow.fromId,
                   toId: flow.toId,

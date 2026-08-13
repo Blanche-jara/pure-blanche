@@ -4,23 +4,21 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
+import 'controller.dart';
 import 'engine.dart';
-import 'models.dart';
-import 'store.dart';
+import 'share.dart';
 import 'tab_expenses.dart';
 import 'tab_members.dart';
 import 'tab_overview.dart';
 import 'ui_kit.dart';
 
 class ProjectView extends StatefulWidget {
-  final SettlementStore store;
-  final SettlementProject project;
+  final SettlementController controller;
   final VoidCallback onClose;
 
   const ProjectView({
     super.key,
-    required this.store,
-    required this.project,
+    required this.controller,
     required this.onClose,
   });
 
@@ -44,7 +42,34 @@ class _ProjectViewState extends State<ProjectView> {
 
   @override
   Widget build(BuildContext context) {
-    final p = widget.project;
+    return ListenableBuilder(
+      listenable: widget.controller,
+      builder: (context, _) => _build(context),
+    );
+  }
+
+  Widget _build(BuildContext context) {
+    final p = widget.controller.project;
+    if (p == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const EmptyHint(
+                icon: Icons.help_outline,
+                title: '정산표를 불러올 수 없다.',
+                subtitle: '삭제되었거나 링크가 잘못됐을 수 있다.',
+              ),
+              const SizedBox(height: 16),
+              GhostButton(label: '목록으로', onTap: widget.onClose),
+            ],
+          ),
+        ),
+      );
+    }
+
     final wide = MediaQuery.of(context).size.width >= 768;
     final flows = pairFlows(p);
     final remaining = flows.fold(0, (s, f) => s + f.amount);
@@ -81,8 +106,40 @@ class _ProjectViewState extends State<ProjectView> {
                       ),
                     ),
                   ),
+                  if (widget.controller.busy) ...[
+                    const SizedBox(width: 10),
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.8,
+                        color: AppColors.signalGreen,
+                      ),
+                    ),
+                  ],
+                  if (widget.controller.isShared) ...[
+                    const SizedBox(width: 10),
+                    GhostButton(
+                      label: '새로고침',
+                      icon: Icons.refresh,
+                      dense: true,
+                      onTap: widget.controller.refresh,
+                    ),
+                  ],
                 ],
               ),
+              const SizedBox(height: 12),
+
+              // ── 공유 상태 / 에러 ──
+              ShareBanner(project: p),
+              if (widget.controller.error != null) ...[
+                const SizedBox(height: 10),
+                _ErrorBanner(
+                  message: widget.controller.error!,
+                  onDismiss: widget.controller.clearError,
+                  onRetry: widget.controller.refresh,
+                ),
+              ],
               const SizedBox(height: 16),
 
               // ── 요약 스탯 ──
@@ -143,16 +200,16 @@ class _ProjectViewState extends State<ProjectView> {
               const SizedBox(height: 20),
 
               if (_tab == 0)
-                ExpensesTab(store: widget.store, project: p)
+                ExpensesTab(controller: widget.controller, project: p)
               else if (_tab == 1)
                 OverviewTab(
-                  store: widget.store,
+                  controller: widget.controller,
                   project: p,
                   onOpenMember: _openMember,
                 )
               else
                 MembersTab(
-                  store: widget.store,
+                  controller: widget.controller,
                   project: p,
                   selectedId: _focusMemberId,
                   onSelect: (id) => setState(() => _focusMemberId = id),
@@ -161,6 +218,52 @@ class _ProjectViewState extends State<ProjectView> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 서버 요청 실패 배너. 이전 상태는 그대로 두고 메시지만 알린다.
+class _ErrorBanner extends StatelessWidget {
+  final String message;
+  final VoidCallback onDismiss;
+  final VoidCallback onRetry;
+
+  const _ErrorBanner({
+    required this.message,
+    required this.onDismiss,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.danger.withValues(alpha: 0.08),
+        border: Border.all(color: AppColors.danger.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, size: 16, color: AppColors.danger),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(fontSize: 13, color: AppColors.parchment),
+            ),
+          ),
+          const SizedBox(width: 10),
+          GhostButton(
+            label: '다시 불러오기',
+            dense: true,
+            color: AppColors.danger,
+            onTap: onRetry,
+          ),
+          const SizedBox(width: 6),
+          GhostButton(label: '닫기', dense: true, onTap: onDismiss),
+        ],
       ),
     );
   }

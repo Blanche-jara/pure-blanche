@@ -4,15 +4,15 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
+import 'controller.dart';
 import 'engine.dart';
 import 'models.dart';
-import 'store.dart';
 import 'ui_kit.dart';
 
 /// 지출 추가/수정. [existing] 이 있으면 수정 모드.
 Future<void> showExpenseDialog({
   required BuildContext context,
-  required SettlementStore store,
+  required SettlementController controller,
   required SettlementProject project,
   Expense? existing,
 }) {
@@ -21,7 +21,7 @@ Future<void> showExpenseDialog({
     title: existing == null ? '지출 추가' : '지출 수정',
     maxWidth: 560,
     builder: (ctx) => _ExpenseForm(
-      store: store,
+      controller: controller,
       project: project,
       existing: existing,
     ),
@@ -29,12 +29,12 @@ Future<void> showExpenseDialog({
 }
 
 class _ExpenseForm extends StatefulWidget {
-  final SettlementStore store;
+  final SettlementController controller;
   final SettlementProject project;
   final Expense? existing;
 
   const _ExpenseForm({
-    required this.store,
+    required this.controller,
     required this.project,
     this.existing,
   });
@@ -103,16 +103,14 @@ class _ExpenseFormState extends State<_ExpenseForm> {
     }
 
     if (widget.existing == null) {
-      widget.store.addExpense(
-        widget.project.id,
+      widget.controller.addExpense(
         title: title,
         amount: amount,
         payerId: _payerId,
         participantIds: ids,
       );
     } else {
-      widget.store.updateExpense(
-        widget.project.id,
+      widget.controller.updateExpense(
         widget.existing!.id,
         title: title,
         amount: amount,
@@ -321,7 +319,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
 /// 건과 무관하게 오간 송금 기록. [fromId]/[toId]/[amount] 로 초기값을 채울 수 있다.
 Future<void> showTransferDialog({
   required BuildContext context,
-  required SettlementStore store,
+  required SettlementController controller,
   required SettlementProject project,
   String? fromId,
   String? toId,
@@ -332,7 +330,7 @@ Future<void> showTransferDialog({
     title: '직접 송금 기록',
     maxWidth: 480,
     builder: (ctx) => _TransferForm(
-      store: store,
+      controller: controller,
       project: project,
       initialFrom: fromId,
       initialTo: toId,
@@ -342,14 +340,14 @@ Future<void> showTransferDialog({
 }
 
 class _TransferForm extends StatefulWidget {
-  final SettlementStore store;
+  final SettlementController controller;
   final SettlementProject project;
   final String? initialFrom;
   final String? initialTo;
   final int? initialAmount;
 
   const _TransferForm({
-    required this.store,
+    required this.controller,
     required this.project,
     this.initialFrom,
     this.initialTo,
@@ -399,8 +397,7 @@ class _TransferFormState extends State<_TransferForm> {
       setState(() => _error = '금액을 입력해주세요.');
       return;
     }
-    widget.store.addTransfer(
-      widget.project.id,
+    widget.controller.addTransfer(
       fromId: _fromId!,
       toId: _toId!,
       amount: amount,

@@ -28,6 +28,20 @@ class PureBlancheApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
       initialRoute: '/',
+      // 정산표 공유 링크(#/settlement/<코드 8자>)는 경로에 값이 들어 있어
+      // routes 맵의 정확일치로는 잡을 수 없다. 여기서 따로 받는다.
+      onGenerateRoute: (settings) {
+        final m = RegExp(r'^/settlement/([a-z0-9]{8})$')
+            .firstMatch(settings.name ?? '');
+        if (m == null) return null;
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => AppWrapper(
+            title: '정산표',
+            child: SettlementApp(code: m.group(1)),
+          ),
+        );
+      },
       routes: {
         '/': (_) => const MainPage(),
         '/code': (_) => const CodeProjectsPage(),

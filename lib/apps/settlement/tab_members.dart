@@ -6,20 +6,20 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
+import 'controller.dart';
 import 'engine.dart';
 import 'models.dart';
-import 'store.dart';
 import 'ui_kit.dart';
 
 class MembersTab extends StatelessWidget {
-  final SettlementStore store;
+  final SettlementController controller;
   final SettlementProject project;
   final String? selectedId;
   final ValueChanged<String> onSelect;
 
   const MembersTab({
     super.key,
-    required this.store,
+    required this.controller,
     required this.project,
     required this.selectedId,
     required this.onSelect,
@@ -70,9 +70,9 @@ class MembersTab extends StatelessWidget {
         _MemberHeadline(project: project, summary: mine),
         const SizedBox(height: 24),
 
-        _OutgoingSection(store: store, project: project, meId: meId),
+        _OutgoingSection(controller: controller, project: project, meId: meId),
         const SizedBox(height: 30),
-        _IncomingSection(store: store, project: project, meId: meId),
+        _IncomingSection(controller: controller, project: project, meId: meId),
       ],
     );
   }
@@ -199,12 +199,12 @@ class _HeadlineLine extends StatelessWidget {
 // ─────────────────────── 내가 보내야 할 건 ───────────────────────
 
 class _OutgoingSection extends StatelessWidget {
-  final SettlementStore store;
+  final SettlementController controller;
   final SettlementProject project;
   final String meId;
 
   const _OutgoingSection({
-    required this.store,
+    required this.controller,
     required this.project,
     required this.meId,
   });
@@ -244,7 +244,7 @@ class _OutgoingSection extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: 14),
               child: _CreditorGroup(
-                store: store,
+                controller: controller,
                 project: project,
                 meId: meId,
                 creditorId: cid,
@@ -257,14 +257,14 @@ class _OutgoingSection extends StatelessWidget {
 }
 
 class _CreditorGroup extends StatelessWidget {
-  final SettlementStore store;
+  final SettlementController controller;
   final SettlementProject project;
   final String meId;
   final String creditorId;
   final List<DebtLeg> legs;
 
   const _CreditorGroup({
-    required this.store,
+    required this.controller,
     required this.project,
     required this.meId,
     required this.creditorId,
@@ -320,7 +320,7 @@ class _CreditorGroup extends StatelessWidget {
           const SizedBox(height: 12),
           for (final leg in legs)
             _LegRow(
-              store: store,
+              controller: controller,
               project: project,
               leg: leg,
               counterpartLabel: null,
@@ -334,7 +334,7 @@ class _CreditorGroup extends StatelessWidget {
                 icon: Icons.done_all,
                 dense: true,
                 onTap: () {
-                  store.settleLegs(project.id, pending);
+                  controller.settleLegs(pending);
                   showToast(context,
                       '${project.nameOf(creditorId)} 건 ${pending.length}개 정산 처리');
                 },
@@ -350,12 +350,12 @@ class _CreditorGroup extends StatelessWidget {
 // ─────────────────────── 나에게 들어올 건 ───────────────────────
 
 class _IncomingSection extends StatelessWidget {
-  final SettlementStore store;
+  final SettlementController controller;
   final SettlementProject project;
   final String meId;
 
   const _IncomingSection({
-    required this.store,
+    required this.controller,
     required this.project,
     required this.meId,
   });
@@ -391,7 +391,7 @@ class _IncomingSection extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: 14),
               child: _DebtorGroup(
-                store: store,
+                controller: controller,
                 project: project,
                 debtorId: did,
                 legs: byDebtor[did]!,
@@ -403,13 +403,13 @@ class _IncomingSection extends StatelessWidget {
 }
 
 class _DebtorGroup extends StatelessWidget {
-  final SettlementStore store;
+  final SettlementController controller;
   final SettlementProject project;
   final String debtorId;
   final List<DebtLeg> legs;
 
   const _DebtorGroup({
-    required this.store,
+    required this.controller,
     required this.project,
     required this.debtorId,
     required this.legs,
@@ -455,7 +455,7 @@ class _DebtorGroup extends StatelessWidget {
           const SizedBox(height: 12),
           for (final leg in legs)
             _LegRow(
-              store: store,
+              controller: controller,
               project: project,
               leg: leg,
               counterpartLabel: '입금 확인',
@@ -471,13 +471,13 @@ class _DebtorGroup extends StatelessWidget {
 /// 채무 건 하나. 오른쪽 버튼이 이 건의 정산 여부를 토글한다.
 /// [counterpartLabel] 이 있으면 그 문구를 버튼에 쓴다(받는 쪽 관점: "입금 확인").
 class _LegRow extends StatelessWidget {
-  final SettlementStore store;
+  final SettlementController controller;
   final SettlementProject project;
   final DebtLeg leg;
   final String? counterpartLabel;
 
   const _LegRow({
-    required this.store,
+    required this.controller,
     required this.project,
     required this.leg,
     required this.counterpartLabel,
@@ -557,8 +557,8 @@ class _LegRow extends StatelessWidget {
               icon: Icons.undo,
               dense: true,
               color: AppColors.warning,
-              onTap: () => store.setLegSettled(
-                  project.id, leg.expenseId, leg.debtorId, false),
+              onTap: () =>
+                  controller.setLegSettled(leg.expenseId, leg.debtorId, false),
             )
           else
             PrimaryButton(
@@ -566,8 +566,7 @@ class _LegRow extends StatelessWidget {
               icon: Icons.check,
               dense: true,
               onTap: () {
-                store.setLegSettled(
-                    project.id, leg.expenseId, leg.debtorId, true);
+                controller.setLegSettled(leg.expenseId, leg.debtorId, true);
                 showToast(context, '${leg.expenseTitle} 정산 처리');
               },
             ),

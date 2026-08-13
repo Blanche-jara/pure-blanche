@@ -14,14 +14,64 @@ import 'package:uuid/uuid.dart';
 import 'models.dart';
 
 const _storageKey = 'pb_settlement_v1';
+const _sharedKey = 'pb_settlement_shared_v1';
 const _uuid = Uuid();
+
+/// 이 브라우저가 알고 있는 **공유 정산표** 하나에 대한 메모.
+/// 실제 데이터는 서버에 있고, 여기에는 다시 찾아갈 단서만 둔다.
+class SharedRef {
+  final String code;
+  final String name;
+
+  /// 이 브라우저에서 만든 정산표라면 삭제 권한 토큰. 남의 링크로 열었으면 null.
+  final String? ownerToken;
+
+  final DateTime lastOpenedAt;
+
+  const SharedRef({
+    required this.code,
+    required this.name,
+    required this.lastOpenedAt,
+    this.ownerToken,
+  });
+
+  bool get isOwner => ownerToken != null;
+
+  Map<String, dynamic> toJson() => {
+        'code': code,
+        'name': name,
+        if (ownerToken != null) 'ownerToken': ownerToken,
+        'lastOpenedAt': lastOpenedAt.toIso8601String(),
+      };
+
+  factory SharedRef.fromJson(Map<String, dynamic> j) => SharedRef(
+        code: j['code'] as String,
+        name: (j['name'] as String?) ?? '정산표',
+        ownerToken: j['ownerToken'] as String?,
+        lastOpenedAt: parseTime(
+            (j['lastOpenedAt'] as String?) ?? DateTime.now().toIso8601String()),
+      );
+}
 
 class SettlementStore extends ChangeNotifier {
   List<SettlementProject> _projects = [];
+  List<SharedRef> _shared = [];
   bool _ready = false;
 
   /// 저장된 프로젝트 목록(최신 생성 순).
   List<SettlementProject> get projects => List.unmodifiable(_projects);
+
+  /// 이 브라우저가 아는 공유 정산표들(최근 연 순).
+  List<SharedRef> get sharedRefs => List.unmodifiable(_shared);
+
+  SharedRef? sharedRef(String code) {
+    for (final s in _shared) {
+      if (s.code == code) return s;
+    }
+    return null;
+  }
+
+  String? ownerTokenFor(String code) => sharedRef(code)?.ownerToken;
 
   /// localStorage 로드가 끝났는지. false면 로딩 스피너.
   bool get ready => _ready;
@@ -45,17 +95,32 @@ class SettlementStore extends ChangeNotifier {
   Future<void> _load() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+
       final raw = prefs.getString(_storageKey);
-      if (raw == null || raw.isEmpty) return;
-      final decoded = jsonDecode(raw);
-      if (decoded is! List) return;
-      _projects = decoded
-          .whereType<Map<String, dynamic>>()
-          .map(SettlementProject.fromJson)
-          .toList();
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          _projects = decoded
+              .whereType<Map<String, dynamic>>()
+              .map(SettlementProject.fromJson)
+              .toList();
+        }
+      }
+
+      final rawShared = prefs.getString(_sharedKey);
+      if (rawShared != null && rawShared.isNotEmpty) {
+        final decoded = jsonDecode(rawShared);
+        if (decoded is List) {
+          _shared = decoded
+              .whereType<Map<String, dynamic>>()
+              .map(SharedRef.fromJson)
+              .toList();
+        }
+      }
     } catch (_) {
       // 저장 형식이 깨졌어도 앱은 살아 있어야 한다. 빈 목록으로 시작.
       _projects = [];
+      _shared = [];
     }
   }
 
@@ -66,9 +131,40 @@ class SettlementStore extends ChangeNotifier {
         _storageKey,
         jsonEncode(_projects.map((p) => p.toJson()).toList()),
       );
+      await prefs.setString(
+        _sharedKey,
+        jsonEncode(_shared.map((s) => s.toJson()).toList()),
+      );
     } catch (_) {
       // 저장 실패해도 메모리 상태는 유지된다.
     }
+  }
+
+  // ─────────────────────── 공유 정산표 메모 ───────────────────────
+
+  /// 공유 정산표를 열거나 갱신할 때마다 호출 — 이름/최근 열람을 최신으로 유지한다.
+  /// [ownerToken] 은 처음 만들 때 한 번만 주고, 이후 호출에서는 기존 값을 지키지 않는다.
+  void rememberShared(SettlementProject project, {String? ownerToken}) {
+    final code = project.code;
+    if (code == null) return;
+
+    final existing = sharedRef(code);
+    final ref = SharedRef(
+      code: code,
+      name: project.name,
+      ownerToken: ownerToken ?? existing?.ownerToken,
+      lastOpenedAt: DateTime.now(),
+    );
+    _shared = [ref, ..._shared.where((s) => s.code != code)];
+    notifyListeners();
+    _persist();
+  }
+
+  /// 목록에서만 지운다(서버 데이터는 그대로).
+  void forgetShared(String code) {
+    _shared = _shared.where((s) => s.code != code).toList();
+    notifyListeners();
+    _persist();
   }
 
   void _update(SettlementProject next) {
