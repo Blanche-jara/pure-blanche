@@ -1,7 +1,8 @@
-# Pure Blanche 방명록 백엔드
+# Pure Blanche 백엔드
 
-Cloudflare Workers + D1 기반 서버리스 방명록 API.
-API 계약의 정답은 [`docs/GUESTBOOK_BACKEND.md`](../docs/GUESTBOOK_BACKEND.md). 이 README는 배포/테스트 절차만 다룬다.
+Cloudflare Workers + D1 기반 서버리스 API. **방명록 + 접속통계 + SMTM(정산표)** 가 한 Worker·한 D1을 공유한다.
+API 계약의 정답은 [`docs/GUESTBOOK_BACKEND.md`](../docs/GUESTBOOK_BACKEND.md)(방명록·통계)와
+[`docs/SETTLEMENT_BACKEND.md`](../docs/SETTLEMENT_BACKEND.md)(SMTM). 이 README는 배포/테스트 절차만 다룬다.
 
 - 프로덕션: `https://api.pure-blanche.com`
 - 로컬 개발: `http://localhost:8787`
@@ -13,7 +14,10 @@ API 계약의 정답은 [`docs/GUESTBOOK_BACKEND.md`](../docs/GUESTBOOK_BACKEND.
 | `package.json` | wrangler devDependency + npm 스크립트 |
 | `wrangler.toml` | Worker 이름, D1 바인딩(`DB`), 커스텀 도메인 라우트 |
 | `schema.sql` | D1 테이블/인덱스 + 환영 메시지 시드 |
-| `src/index.js` | Worker fetch 핸들러 (ES module) |
+| `src/index.js` | Worker fetch 핸들러 — 방명록·통계 + 라우터 (ES module) |
+| `src/common.js` | CORS/JSON 응답/IP 해시/관리자 인증 (index·settlement 공용) |
+| `src/settlement.js` | SMTM 라우트 `/api/settlement/**` |
+| `smoke_settlement.sh` | SMTM API 인수 기준 35개 검증 스크립트 |
 
 ## 엔드포인트 요약
 
@@ -24,10 +28,11 @@ API 계약의 정답은 [`docs/GUESTBOOK_BACKEND.md`](../docs/GUESTBOOK_BACKEND.
 | `PATCH` | `/api/guestbook/:id` | 🔒 관리자 — `200 {message:{...}}` (name/message 수정) |
 | `DELETE` | `/api/guestbook/:id` | 🔒 관리자 — `200 {ok:true,deleted:id}` |
 | `GET`/`POST` | `/api/admin/verify` | 🔒 관리자 비번 확인 — `200 {ok:true}` / `401` |
-| `POST` | `/api/hit` | 접속 기록(공개) — `{page}`(10개 슬러그) → `200 {ok:true}` |
+| `POST` | `/api/hit` | 접속 기록(공개) — `{page}`(11개 슬러그, `smtm` 포함) → `200 {ok:true}` |
 | `POST` | `/api/wg/answer` | Word Guesser 정답 보고(공개) — `{variant,answer}` → `200 {ok:true}` |
 | `GET` | `/api/stats` | 🔒 관리자 통계 — `{pages:[{page,total,today,unique_today}], wgToday:[{variant,answer,n,users}]}` |
 | `GET` | `/` 또는 `/health` | `200 {ok:true,service:"pure-blanche-guestbook"}` |
+| (여러) | `/api/settlement/**` | SMTM — 계약: [`docs/SETTLEMENT_BACKEND.md`](../docs/SETTLEMENT_BACKEND.md) 3.2 |
 | `OPTIONS` | (전체) | `204` + CORS 헤더 |
 
 🔒 = `Authorization: Bearer <ADMIN_TOKEN>` 헤더 필요. 검증/스팸/rate-limit 규칙과 에러 코드 표는 계약 문서 3~4장 참조.
@@ -118,6 +123,29 @@ npx wrangler deploy
 ```bash
 curl https://api.pure-blanche.com/health
 curl https://api.pure-blanche.com/api/guestbook
+
+# SMTM 라우트 + 테이블이 함께 살아있는지 (없는 코드 조회)
+curl https://api.pure-blanche.com/api/settlement/zzzzzzzz
+```
+
+마지막 응답은 **`{"error":"not_found",...}`** 여야 한다.
+
+> ⚠️ **`{"error":"server_error"}`(500)가 나오면 스키마가 원격 D1에 안 들어간 것이다.**
+> 이 라우트는 응답 전에 `settle_projects` 를 조회하므로, 404가 돌아온다는 건
+> 테이블이 존재한다는 증거이기도 하다. 500이면 3단계(`--remote --file=./schema.sql`)를
+> 다시 실행하고 아래로 확인한다:
+> ```bash
+> npx wrangler d1 execute pure-blanche-guestbook --remote \
+>   --command "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+> ```
+> `settle_projects / settle_members / settle_expenses / settle_transfers / settle_legs`
+> 5개가 보여야 한다. `schema.sql` 은 전부 `IF NOT EXISTS` 라 재실행해도
+> 방명록 데이터에 영향이 없다.
+
+전체 계약을 한 번에 검증하려면(만든 정산표는 끝에 삭제된다):
+
+```bash
+API=https://api.pure-blanche.com bash smoke_settlement.sh   # 35개 항목
 ```
 
 프론트엔드는 `--dart-define=GUESTBOOK_API=...`로 베이스 URL을 주입한다(기본값은 프로덕션).

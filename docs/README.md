@@ -17,6 +17,42 @@
 | [TODO.md](./TODO.md) | 작업 로드맵 (현재 진행 상태) | 다음에 뭘 할지 정할 때 |
 | [PARALLEL_TASKS.md](./PARALLEL_TASKS.md) | 병렬 세션(c1/c2/c3) 분업 계획 + 프롬프트 | 멀티 세션으로 작업 분배할 때 |
 
+## 다른 컴퓨터에서 이어받기
+
+```bash
+git clone https://github.com/Blanche-jara/pure-blanche.git && cd pure-blanche
+flutter pub get
+flutter run -d chrome                    # 프론트만 — 프로덕션 API(api.pure-blanche.com)를 그대로 쓴다
+```
+
+백엔드(방명록·SMTM)를 **로컬 D1**로 함께 돌리려면 터미널 두 개:
+
+```bash
+# 터미널 1 — Worker
+cd backend && npm install
+npx wrangler d1 execute pure-blanche-guestbook --local --file=./schema.sql   # 최초 1회
+npx wrangler dev                                                             # → localhost:8787
+
+# 터미널 2 — 앱을 로컬 Worker에 물린다
+flutter run -d chrome --dart-define=GUESTBOOK_API=http://localhost:8787
+```
+
+검증 수단:
+
+| 명령 | 확인 대상 |
+|------|-----------|
+| `flutter analyze lib` | 정적 분석 (`lib/` 만 — `apps_src/` 는 별도 패키지라 에러가 난다) |
+| `flutter test test/settlement_engine_test.dart` | SMTM 정산 계산 규칙 14개 |
+| `bash backend/smoke_settlement.sh` | SMTM API 35개 (로컬 Worker 필요) |
+| `API=https://api.pure-blanche.com bash backend/smoke_settlement.sh` | 배포된 API 검증 |
+| `flutter test test/settlement_service_integration_test.dart --dart-define=GUESTBOOK_API=http://localhost:8787` | 서비스↔Worker 왕복 |
+
+> `flutter test` 를 통째로 돌리면 `test/widget_test.dart` 가 실패한다 — 기존 부채다([TODO.md](./TODO.md) 참조).
+
+**배포**: `main` 에 푸시하면 GitHub Actions가 프론트를 GitHub Pages로 민다.
+백엔드는 별도이며 `backend/README.md` 2장을 따른다. **프론트보다 백엔드를 먼저** 올려야
+새 API를 쓰는 화면이 라이브에서 깨지지 않는다.
+
 ## 핵심 사실 (TL;DR)
 
 - **무엇**: Flutter Web으로 만든 Blanche의 개인 포트폴리오 + 유틸리티 허브. 도메인 `pure-blanche.com`.
