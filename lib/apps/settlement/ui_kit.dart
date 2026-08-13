@@ -10,6 +10,14 @@ import '../../theme/app_colors.dart';
 
 final _won = NumberFormat('#,###');
 
+/// 좁은 화면(모바일) 여부. 여행·결제 특성상 대부분 모바일로 쓰므로
+/// 이 값이 true면 여백·글자를 줄여 **한 화면에 더 많은 줄**을 넣는다.
+bool isCompact(BuildContext context) => MediaQuery.sizeOf(context).width < 600;
+
+/// 화면 폭에 따라 값을 고른다. `pick(context, 12, 18)` → 모바일 12 / 데스크톱 18.
+T pick<T>(BuildContext context, T compact, T wide) =>
+    isCompact(context) ? compact : wide;
+
 /// 12345 → "12,345".
 String formatWon(int amount) => _won.format(amount);
 
@@ -31,14 +39,14 @@ class SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.only(bottom: pick(context, 8.0, 12.0)),
       child: Row(
         children: [
           Text(
             text,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'Segoe UI',
-              fontSize: 15,
+              fontSize: pick(context, 14.0, 15.0),
               fontWeight: FontWeight.w700,
               letterSpacing: -0.2,
               color: AppColors.snow,
@@ -62,7 +70,9 @@ class SectionTitle extends StatelessWidget {
 /// 카본 배경 + 차콜 보더 카드. [hoverable] 이면 호버 시 보더가 signalGreen 으로.
 class PanelCard extends StatefulWidget {
   final Widget child;
-  final EdgeInsetsGeometry padding;
+
+  /// 안 주면 화면 폭에 맞춰 자동(모바일 12/10, 데스크톱 18/16).
+  final EdgeInsetsGeometry? padding;
   final VoidCallback? onTap;
   final bool highlighted;
   final Color? borderColor;
@@ -70,7 +80,7 @@ class PanelCard extends StatefulWidget {
   const PanelCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(18),
+    this.padding,
     this.onTap,
     this.highlighted = false,
     this.borderColor,
@@ -102,7 +112,11 @@ class _PanelCardState extends State<PanelCard> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: widget.padding,
+          padding: widget.padding ??
+              EdgeInsets.symmetric(
+                horizontal: pick(context, 12.0, 18.0),
+                vertical: pick(context, 10.0, 16.0),
+              ),
           decoration: BoxDecoration(
             color: AppColors.carbon,
             border: Border.all(color: border),
@@ -339,8 +353,10 @@ class LabeledField extends StatelessWidget {
             hintStyle: const TextStyle(color: AppColors.steel, fontSize: 13.5),
             filled: true,
             fillColor: AppColors.abyss,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: pick(context, 10.0, 12.0),
+              vertical: pick(context, 9.0, 12.0),
+            ),
             counterText: '',
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
@@ -394,7 +410,10 @@ class _MemberChipState extends State<MemberChip> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+          padding: EdgeInsets.symmetric(
+            horizontal: pick(context, 10.0, 13.0),
+            vertical: pick(context, 6.0, 8.0),
+          ),
           decoration: BoxDecoration(
             color: on
                 ? widget.accent.withValues(alpha: 0.14)
@@ -413,7 +432,7 @@ class _MemberChipState extends State<MemberChip> {
               Text(
                 widget.name,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: pick(context, 12.5, 13.0),
                   fontWeight: on ? FontWeight.w700 : FontWeight.w500,
                   color: on ? widget.accent : AppColors.parchment,
                 ),
@@ -524,7 +543,10 @@ class EmptyHint extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 44, horizontal: 20),
+      padding: EdgeInsets.symmetric(
+        vertical: pick(context, 24.0, 44.0),
+        horizontal: 20,
+      ),
       decoration: BoxDecoration(
         border: Border.all(
           color: AppColors.warmCharcoal.withValues(alpha: 0.6),
@@ -533,8 +555,8 @@ class EmptyHint extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Icon(icon, size: 30, color: AppColors.warmCharcoal),
-          const SizedBox(height: 12),
+          Icon(icon, size: pick(context, 24.0, 30.0), color: AppColors.warmCharcoal),
+          SizedBox(height: pick(context, 8.0, 12.0)),
           Text(
             title,
             textAlign: TextAlign.center,
@@ -566,7 +588,10 @@ Future<T?> showSettlementDialog<T>({
     barrierColor: Colors.black.withValues(alpha: 0.72),
     builder: (ctx) => Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.all(20),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isCompact(ctx) ? 10 : 20,
+        vertical: 20,
+      ),
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
         child: Container(
@@ -576,7 +601,7 @@ Future<T?> showSettlementDialog<T>({
             borderRadius: BorderRadius.circular(12),
           ),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(22),
+            padding: EdgeInsets.all(pick(ctx, 16.0, 22.0)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,

@@ -24,7 +24,8 @@ class OverviewTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final wide = MediaQuery.of(context).size.width >= 768;
+    final compact = isCompact(context);
+    final wide = !compact;
     final flows = pairFlows(project);
     final summaries = memberSummaries(project);
 
@@ -53,7 +54,8 @@ class OverviewTab extends StatelessWidget {
           )
         else if (flows.isEmpty)
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 34, horizontal: 20),
+            padding: EdgeInsets.symmetric(
+                vertical: compact ? 20 : 34, horizontal: 20),
             decoration: BoxDecoration(
               color: AppColors.signalGreen.withValues(alpha: 0.05),
               border: Border.all(
@@ -62,8 +64,8 @@ class OverviewTab extends StatelessWidget {
             ),
             child: const Column(
               children: [
-                Icon(Icons.verified, size: 30, color: AppColors.signalGreen),
-                SizedBox(height: 12),
+                Icon(Icons.verified, size: 26, color: AppColors.signalGreen),
+                SizedBox(height: 10),
                 Text(
                   '정산 완료. 남은 송금이 없다.',
                   style: TextStyle(
@@ -78,7 +80,7 @@ class OverviewTab extends StatelessWidget {
         else
           for (final f in flows)
             Padding(
-              padding: const EdgeInsets.only(bottom: 10),
+              padding: EdgeInsets.only(bottom: compact ? 6 : 10),
               child: _FlowRow(
                 controller: controller,
                 project: project,
@@ -86,23 +88,35 @@ class OverviewTab extends StatelessWidget {
                 wide: wide,
               ),
             ),
-        const SizedBox(height: 32),
+        SizedBox(height: compact ? 20 : 32),
         const SectionTitle('인원 요약'),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            for (final s in summaries)
-              SizedBox(
-                width: wide ? 258 : double.infinity,
-                child: _MemberSummaryCard(
-                  project: project,
-                  summary: s,
-                  onTap: () => onOpenMember(s.memberId),
-                ),
+        if (compact)
+          // 모바일: 카드 대신 한 줄짜리 행으로 — 인원이 많아도 한 화면에 들어온다.
+          for (final s in summaries)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: _MemberSummaryRow(
+                project: project,
+                summary: s,
+                onTap: () => onOpenMember(s.memberId),
               ),
-          ],
-        ),
+            )
+        else
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              for (final s in summaries)
+                SizedBox(
+                  width: 258,
+                  child: _MemberSummaryCard(
+                    project: project,
+                    summary: s,
+                    onTap: () => onOpenMember(s.memberId),
+                  ),
+                ),
+            ],
+          ),
       ],
     );
   }
@@ -140,8 +154,12 @@ class _FlowRow extends StatelessWidget {
     final fromName = project.nameOf(flow.fromId);
     final toName = project.nameOf(flow.toId);
 
+    final compact = !wide;
     return PanelCard(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 18,
+        vertical: compact ? 10 : 16,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -222,17 +240,20 @@ class _FlowRow extends StatelessWidget {
                 Money(flow.amount, size: 16, color: AppColors.signalGreen),
               ],
             ),
-          const SizedBox(height: 10),
+          SizedBox(height: compact ? 6 : 10),
           Row(
             children: [
               Expanded(
                 child: Text(
                   _breakdown,
-                  style:
-                      const TextStyle(fontSize: 11.5, color: AppColors.steel),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: compact ? 10.5 : 11.5,
+                      color: AppColors.steel),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               GhostButton(
                 label: '입금 기록',
                 dense: true,
@@ -323,6 +344,96 @@ class _MemberSummaryCard extends StatelessWidget {
           ],
           if (summary.toSend == 0 && summary.toReceive == 0)
             const _Pill(text: '정산 완료', color: AppColors.steel),
+        ],
+      ),
+    );
+  }
+}
+
+/// 모바일용 인원 요약 한 줄. 이름 / 더낸·덜낸 / 보낼·받을 을 한 행에 담는다.
+class _MemberSummaryRow extends StatelessWidget {
+  final SettlementProject project;
+  final MemberSummary summary;
+  final VoidCallback onTap;
+
+  const _MemberSummaryRow({
+    required this.project,
+    required this.summary,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final net = summary.net;
+    final netColor = net > 0
+        ? AppColors.signalGreen
+        : net < 0
+            ? AppColors.danger
+            : AppColors.steel;
+
+    final String action;
+    final Color actionColor;
+    if (summary.toSend > 0) {
+      action = '보낼 ${formatWon(summary.toSend)}';
+      actionColor = AppColors.danger;
+    } else if (summary.toReceive > 0) {
+      action = '받을 ${formatWon(summary.toReceive)}';
+      actionColor = AppColors.signalGreen;
+    } else {
+      action = '완료';
+      actionColor = AppColors.steel;
+    }
+
+    return PanelCard(
+      onTap: onTap,
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: Text(
+              project.nameOf(summary.memberId),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontFamily: 'Segoe UI',
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                color: AppColors.snow,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 4,
+            child: Text(
+              '${net >= 0 ? '+' : '−'}${formatWon(net.abs())}',
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'Consolas',
+                fontSize: 12.5,
+                color: netColor,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 4,
+            child: Text(
+              action,
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'Consolas',
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: actionColor,
+              ),
+            ),
+          ),
+          const Icon(Icons.chevron_right, size: 15, color: AppColors.steel),
         ],
       ),
     );

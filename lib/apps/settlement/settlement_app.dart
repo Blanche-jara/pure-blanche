@@ -5,6 +5,8 @@
 /// - **공유**: 서버(D1)에 저장되고 `#/settlement/<code>` 링크로 함께 편집.
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../services/settlement_service.dart';
@@ -242,10 +244,14 @@ class _ProjectListView extends StatelessWidget {
   Widget build(BuildContext context) {
     final projects = store.projects;
     final shared = store.sharedRefs;
-    final wide = MediaQuery.of(context).size.width >= 768;
+    final compact = isCompact(context);
+    final wide = !compact;
 
     return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: wide ? 40 : 18, vertical: 32),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 40,
+        vertical: compact ? 16 : 32,
+      ),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1000),
@@ -255,53 +261,56 @@ class _ProjectListView extends StatelessWidget {
               const Text(
                 'SETTLEMENT',
                 style: TextStyle(
-                  fontSize: 11.5,
+                  fontSize: 11,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 2.52,
                   color: AppColors.signalGreen,
                 ),
               ),
-              const SizedBox(height: 10),
-              const Text(
+              SizedBox(height: compact ? 5 : 10),
+              Text(
                 'SMTM',
                 style: TextStyle(
                   fontFamily: 'Segoe UI',
-                  fontSize: 34,
+                  fontSize: compact ? 26 : 34,
                   fontWeight: FontWeight.w700,
                   letterSpacing: -1,
                   color: AppColors.snow,
                 ),
               ),
-              const SizedBox(height: 10),
-              const Text(
+              SizedBox(height: compact ? 5 : 10),
+              Text(
                 '누가 결제했는지만 적으면, 누가 누구에게 얼마를 보내야 하는지 정리해준다.',
                 style: TextStyle(
-                    fontSize: 14, color: AppColors.parchment, height: 1.6),
+                    fontSize: compact ? 12.5 : 14,
+                    color: AppColors.parchment,
+                    height: 1.5),
               ),
-              const SizedBox(height: 28),
-              Row(
-                children: [
-                  PrimaryButton(
-                    label: '새 프로젝트',
-                    icon: Icons.add,
-                    onTap: () => _create(context),
-                  ),
-                  const SizedBox(width: 10),
-                  GhostButton(
-                    label: '공유 링크로 열기',
-                    icon: Icons.link,
-                    onTap: () => _openByCode(context),
-                  ),
-                ],
+              SizedBox(height: compact ? 16 : 28),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: PrimaryButton(
+                  label: '새 프로젝트',
+                  icon: Icons.add,
+                  onTap: () => _create(context),
+                ),
               ),
 
               // ── 공유 정산표 ──
               if (shared.isNotEmpty) ...[
-                const SizedBox(height: 30),
-                SectionTitle('공유 정산표', trailingText: '${shared.length}개'),
+                SizedBox(height: compact ? 20 : 30),
+                SectionTitle(
+                  '공유 정산표',
+                  trailingText: '${shared.length}개',
+                  action: GhostButton(
+                    label: '코드로 열기',
+                    dense: true,
+                    onTap: () => _openByCode(context),
+                  ),
+                ),
                 Wrap(
-                  spacing: 16,
-                  runSpacing: 16,
+                  spacing: 12,
+                  runSpacing: compact ? 6 : 12,
                   children: [
                     for (final ref in shared)
                       SizedBox(
@@ -327,10 +336,17 @@ class _ProjectListView extends StatelessWidget {
               ],
 
               // ── 로컬 정산표 ──
-              const SizedBox(height: 30),
+              SizedBox(height: compact ? 20 : 30),
               SectionTitle(
                 '이 브라우저 정산표',
                 trailingText: projects.isEmpty ? null : '${projects.length}개',
+                action: shared.isEmpty
+                    ? GhostButton(
+                        label: '코드로 열기',
+                        dense: true,
+                        onTap: () => _openByCode(context),
+                      )
+                    : null,
               ),
               if (projects.isEmpty && shared.isEmpty)
                 const EmptyHint(
@@ -345,8 +361,8 @@ class _ProjectListView extends StatelessWidget {
                 )
               else
                 Wrap(
-                  spacing: 16,
-                  runSpacing: 16,
+                  spacing: 12,
+                  runSpacing: compact ? 6 : 12,
                   children: [
                     for (final p in projects)
                       SizedBox(
@@ -368,12 +384,12 @@ class _ProjectListView extends StatelessWidget {
                       ),
                   ],
                 ),
-              const SizedBox(height: 40),
+              SizedBox(height: compact ? 24 : 40),
               Text(
                 '공유 정산표는 서버에 저장되고 링크를 아는 사람이 함께 편집한다. '
                 '그 외 정산표는 이 브라우저에만 남는다.',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: compact ? 11 : 12,
                   height: 1.6,
                   color: AppColors.steel.withValues(alpha: 0.85),
                 ),
@@ -485,6 +501,7 @@ class _SharedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = isCompact(context);
     return PanelCard(
       onTap: onOpen,
       highlighted: true,
@@ -493,16 +510,16 @@ class _SharedCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.link, size: 15, color: AppColors.signalGreen),
+              const Icon(Icons.link, size: 14, color: AppColors.signalGreen),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   sharedRef.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Segoe UI',
-                    fontSize: 17,
+                    fontSize: compact ? 15 : 17,
                     fontWeight: FontWeight.w700,
                     color: AppColors.snow,
                   ),
@@ -522,21 +539,30 @@ class _SharedCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            sharedRef.code,
-            style: const TextStyle(
-              fontFamily: 'Consolas',
-              fontSize: 13,
-              letterSpacing: 1.5,
-              color: AppColors.parchment,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${sharedRef.isOwner ? '내가 만든 정산표' : '링크로 참여'} · '
-            '최근 ${sharedRef.lastOpenedAt.year}.${formatDay(sharedRef.lastOpenedAt)}',
-            style: const TextStyle(fontSize: 12, color: AppColors.steel),
+          SizedBox(height: compact ? 4 : 8),
+          Row(
+            children: [
+              Text(
+                sharedRef.code,
+                style: TextStyle(
+                  fontFamily: 'Consolas',
+                  fontSize: compact ? 12 : 13,
+                  letterSpacing: 1.5,
+                  color: AppColors.parchment,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${sharedRef.isOwner ? '내가 만듦' : '링크로 참여'} · '
+                  '${formatDay(sharedRef.lastOpenedAt)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: compact ? 11 : 12, color: AppColors.steel),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -559,6 +585,7 @@ class _ProjectCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = isCompact(context);
     final done = isFullySettled(project);
     final total = totalSpent(project);
 
@@ -574,9 +601,9 @@ class _ProjectCard extends StatelessWidget {
                   project.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Segoe UI',
-                    fontSize: 17,
+                    fontSize: compact ? 15 : 17,
                     fontWeight: FontWeight.w700,
                     color: AppColors.snow,
                   ),
@@ -596,17 +623,20 @@ class _ProjectCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: compact ? 2 : 4),
           Text(
             '${project.members.length}명 · 지출 ${project.expenses.length}건 · '
-            '${project.createdAt.year}.${formatDay(project.createdAt)}',
-            style: const TextStyle(fontSize: 12.5, color: AppColors.steel),
+            '${formatDay(project.createdAt)}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+                fontSize: compact ? 11.5 : 12.5, color: AppColors.steel),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: compact ? 8 : 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Money(total, size: 20, color: AppColors.snow),
+              Money(total, size: compact ? 17 : 20, color: AppColors.snow),
               const Spacer(),
               Container(
                 padding:
@@ -627,14 +657,15 @@ class _ProjectCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          ProgressBar(value: settledRatio(project)),
-          const SizedBox(height: 12),
+          SizedBox(height: compact ? 8 : 12),
+          ProgressBar(value: settledRatio(project), height: compact ? 4 : 6),
+          SizedBox(height: compact ? 7 : 12),
           Text(
             project.members.map((m) => m.name).join(' · '),
-            maxLines: 2,
+            maxLines: compact ? 1 : 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12, color: AppColors.parchment),
+            style: TextStyle(
+                fontSize: compact ? 11 : 12, color: AppColors.parchment),
           ),
         ],
       ),
@@ -871,7 +902,10 @@ class _CreateProjectFormState extends State<_CreateProjectForm> {
 
   @override
   Widget build(BuildContext context) {
-    final wide = MediaQuery.of(context).size.width >= 560;
+    // 다이얼로그 안쪽 실제 가용 폭에서 2열로 나눈다(모바일에서도 2열 유지).
+    final dialogWidth =
+        math.min(MediaQuery.sizeOf(context).width - 20, 520.0);
+    final fieldWidth = (dialogWidth - 32 - 10) / 2;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -916,7 +950,7 @@ class _CreateProjectFormState extends State<_CreateProjectForm> {
         ),
         const SizedBox(height: 8),
         ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 240),
+          constraints: BoxConstraints(maxHeight: pick(context, 200.0, 240.0)),
           child: SingleChildScrollView(
             child: Wrap(
               spacing: 10,
@@ -924,7 +958,7 @@ class _CreateProjectFormState extends State<_CreateProjectForm> {
               children: [
                 for (var i = 0; i < _names.length; i++)
                   SizedBox(
-                    width: wide ? 218 : double.infinity,
+                    width: fieldWidth,
                     child: LabeledField(
                       label: '${i + 1}번',
                       controller: _names[i],

@@ -124,6 +124,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
   @override
   Widget build(BuildContext context) {
     final p = widget.project;
+    final compact = isCompact(context);
     final shares = _amountValue > 0 && _participants.isNotEmpty
         ? sharesOf(_preview)
         : const <String, int>{};
@@ -140,7 +141,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
           autofocus: true,
           onChanged: (_) => setState(() {}),
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: compact ? 10 : 14),
         LabeledField(
           label: '결제 금액 (원)',
           controller: _amount,
@@ -149,14 +150,14 @@ class _ExpenseFormState extends State<_ExpenseForm> {
           maxLength: 9,
           onChanged: (_) => setState(() {}),
         ),
-        const SizedBox(height: 18),
+        SizedBox(height: compact ? 12 : 18),
 
         // ── 결제자 ──
         const _FieldLabel('결제한 사람'),
         const SizedBox(height: 8),
         Wrap(
-          spacing: 8,
-          runSpacing: 8,
+          spacing: compact ? 6 : 8,
+          runSpacing: compact ? 6 : 8,
           children: [
             for (final m in p.members)
               MemberChip(
@@ -171,7 +172,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
               ),
           ],
         ),
-        const SizedBox(height: 18),
+        SizedBox(height: compact ? 12 : 18),
 
         // ── 참여자 ──
         Row(
@@ -201,8 +202,8 @@ class _ExpenseFormState extends State<_ExpenseForm> {
         ),
         const SizedBox(height: 8),
         Wrap(
-          spacing: 8,
-          runSpacing: 8,
+          spacing: compact ? 6 : 8,
+          runSpacing: compact ? 6 : 8,
           children: [
             for (final m in p.members)
               MemberChip(
@@ -222,9 +223,9 @@ class _ExpenseFormState extends State<_ExpenseForm> {
 
         // ── 미리보기 ──
         if (shares.isNotEmpty) ...[
-          const SizedBox(height: 18),
+          SizedBox(height: compact ? 12 : 18),
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: EdgeInsets.all(compact ? 10 : 14),
             decoration: BoxDecoration(
               color: AppColors.abyss,
               border: Border.all(
@@ -256,24 +257,33 @@ class _ExpenseFormState extends State<_ExpenseForm> {
                     padding: const EdgeInsets.only(bottom: 4),
                     child: Row(
                       children: [
-                        Text(
-                          p.nameOf(leg.debtorId),
-                          style: const TextStyle(
-                              fontSize: 13, color: AppColors.snow),
+                        Flexible(
+                          child: Text(
+                            p.nameOf(leg.debtorId),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 12.5, color: AppColors.snow),
+                          ),
                         ),
                         const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 8),
+                          padding: EdgeInsets.symmetric(horizontal: 6),
                           child: Icon(Icons.arrow_forward,
-                              size: 13, color: AppColors.signalGreen),
+                              size: 12, color: AppColors.signalGreen),
                         ),
-                        Text(
-                          p.nameOf(leg.creditorId),
-                          style: const TextStyle(
-                              fontSize: 13, color: AppColors.snow),
+                        Flexible(
+                          child: Text(
+                            p.nameOf(leg.creditorId),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 12.5, color: AppColors.snow),
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         const Spacer(),
                         Money(leg.amount,
-                            size: 13, color: AppColors.signalGreen),
+                            size: 12.5, color: AppColors.signalGreen),
                       ],
                     ),
                   ),
@@ -295,7 +305,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
               style:
                   const TextStyle(fontSize: 12.5, color: AppColors.danger)),
         ],
-        const SizedBox(height: 22),
+        SizedBox(height: compact ? 16 : 22),
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [

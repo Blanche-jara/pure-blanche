@@ -24,6 +24,7 @@ class ExpensesTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final expenses = project.expenses.reversed.toList();
     final transfers = project.transfers.reversed.toList();
+    final compact = isCompact(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -51,14 +52,14 @@ class ExpensesTab extends StatelessWidget {
         else
           for (final e in expenses)
             Padding(
-              padding: const EdgeInsets.only(bottom: 10),
+              padding: EdgeInsets.only(bottom: compact ? 6 : 10),
               child: _ExpenseRow(
                 controller: controller,
                 project: project,
                 expense: e,
               ),
             ),
-        const SizedBox(height: 32),
+        SizedBox(height: compact ? 20 : 32),
         SectionTitle(
           '직접 송금',
           trailingText: '${transfers.length}건',
@@ -82,7 +83,7 @@ class ExpensesTab extends StatelessWidget {
         else
           for (final t in transfers)
             Padding(
-              padding: const EdgeInsets.only(bottom: 10),
+              padding: EdgeInsets.only(bottom: compact ? 6 : 10),
               child: _TransferRow(
                 controller: controller,
                 project: project,
@@ -107,6 +108,7 @@ class _ExpenseRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = isCompact(context);
     final shares = sharesOf(expense);
     final others = expense.participantIds
         .where((id) => id != expense.payerId)
@@ -118,7 +120,10 @@ class _ExpenseRow extends StatelessWidget {
     final allSettled = others.isEmpty || settledCount == others.length;
 
     return PanelCard(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 11 : 16,
+        vertical: compact ? 9 : 14,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -136,9 +141,9 @@ class _ExpenseRow extends StatelessWidget {
                             expense.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: 'Segoe UI',
-                              fontSize: 15,
+                              fontSize: compact ? 14 : 15,
                               fontWeight: FontWeight.w600,
                               color: AppColors.snow,
                             ),
@@ -154,11 +159,14 @@ class _ExpenseRow extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    SizedBox(height: compact ? 3 : 6),
                     RichText(
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       text: TextSpan(
-                        style: const TextStyle(
-                            fontSize: 12.5, color: AppColors.steel),
+                        style: TextStyle(
+                            fontSize: compact ? 11.5 : 12.5,
+                            color: AppColors.steel),
                         children: [
                           TextSpan(
                             text: project.nameOf(expense.payerId),
@@ -182,8 +190,8 @@ class _ExpenseRow extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Money(expense.amount, size: 17),
-                  const SizedBox(height: 6),
+                  Money(expense.amount, size: compact ? 15 : 17),
+                  SizedBox(height: compact ? 2 : 6),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -218,10 +226,10 @@ class _ExpenseRow extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: compact ? 8 : 12),
           Wrap(
-            spacing: 6,
-            runSpacing: 6,
+            spacing: compact ? 4 : 6,
+            runSpacing: compact ? 4 : 6,
             children: [
               for (final id in expense.participantIds)
                 _ShareChip(
@@ -235,13 +243,13 @@ class _ExpenseRow extends StatelessWidget {
             ],
           ),
           if (others.isNotEmpty) ...[
-            const SizedBox(height: 10),
+            SizedBox(height: compact ? 6 : 10),
             Text(
               allSettled
                   ? '이 건은 전원 입금 완료'
                   : '입금 완료 $settledCount / ${others.length}명',
               style: TextStyle(
-                fontSize: 11.5,
+                fontSize: compact ? 10.5 : 11.5,
                 color:
                     allSettled ? AppColors.signalGreen : AppColors.steel,
               ),
@@ -274,8 +282,12 @@ class _ShareChip extends StatelessWidget {
             ? AppColors.signalGreen
             : AppColors.parchment;
 
+    final compact = isCompact(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 7 : 10,
+        vertical: compact ? 3 : 5,
+      ),
       decoration: BoxDecoration(
         color: AppColors.abyss,
         border: Border.all(color: color.withValues(alpha: 0.35)),
@@ -293,14 +305,14 @@ class _ShareChip extends StatelessWidget {
           ],
           Text(
             name,
-            style: TextStyle(fontSize: 12, color: color),
+            style: TextStyle(fontSize: compact ? 11 : 12, color: color),
           ),
-          const SizedBox(width: 6),
+          SizedBox(width: compact ? 4 : 6),
           Text(
             formatWon(amount),
             style: TextStyle(
               fontFamily: 'Consolas',
-              fontSize: 11.5,
+              fontSize: compact ? 10.5 : 11.5,
               color: color.withValues(alpha: 0.75),
               decoration: settled ? TextDecoration.lineThrough : null,
             ),
@@ -324,8 +336,12 @@ class _TransferRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = isCompact(context);
     return PanelCard(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 11 : 16,
+        vertical: compact ? 8 : 12,
+      ),
       child: Row(
         children: [
           Expanded(
@@ -341,10 +357,11 @@ class _TransferRow extends StatelessWidget {
                         color: AppColors.snow),
                   ),
                 ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 10),
-                  child: Icon(Icons.arrow_forward,
-                      size: 14, color: AppColors.signalGreen),
+                Padding(
+                  padding:
+                      EdgeInsets.symmetric(horizontal: compact ? 6 : 10),
+                  child: const Icon(Icons.arrow_forward,
+                      size: 13, color: AppColors.signalGreen),
                 ),
                 Flexible(
                   child: Text(
@@ -370,16 +387,18 @@ class _TransferRow extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          Text(
-            formatDay(transfer.createdAt),
-            style: const TextStyle(
-                fontFamily: 'Consolas',
-                fontSize: 11.5,
-                color: AppColors.steel),
-          ),
-          const SizedBox(width: 12),
-          Money(transfer.amount, size: 15, color: AppColors.mint),
+          if (!compact) ...[
+            const SizedBox(width: 12),
+            Text(
+              formatDay(transfer.createdAt),
+              style: const TextStyle(
+                  fontFamily: 'Consolas',
+                  fontSize: 11.5,
+                  color: AppColors.steel),
+            ),
+          ],
+          SizedBox(width: compact ? 8 : 12),
+          Money(transfer.amount, size: compact ? 13.5 : 15, color: AppColors.mint),
           const SizedBox(width: 4),
           _MiniIcon(
             icon: Icons.delete_outline,

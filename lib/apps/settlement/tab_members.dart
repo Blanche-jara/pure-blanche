@@ -65,13 +65,13 @@ class MembersTab extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: 22),
+        SizedBox(height: isCompact(context) ? 14 : 22),
 
         _MemberHeadline(project: project, summary: mine),
-        const SizedBox(height: 24),
+        SizedBox(height: isCompact(context) ? 16 : 24),
 
         _OutgoingSection(controller: controller, project: project, meId: meId),
-        const SizedBox(height: 30),
+        SizedBox(height: isCompact(context) ? 20 : 30),
         _IncomingSection(controller: controller, project: project, meId: meId),
       ],
     );
@@ -87,6 +87,7 @@ class _MemberHeadline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = isCompact(context);
     final flows = pairFlows(project);
     final outgoing = flows.where((f) => f.fromId == summary.memberId).toList();
     final incoming = flows.where((f) => f.toId == summary.memberId).toList();
@@ -99,20 +100,23 @@ class _MemberHeadline extends StatelessWidget {
         children: [
           Text(
             name,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'Segoe UI',
-              fontSize: 20,
+              fontSize: compact ? 17 : 20,
               fontWeight: FontWeight.w700,
               letterSpacing: -0.4,
               color: AppColors.snow,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             '결제 ${formatWonUnit(summary.paid)} · 본인 부담 ${formatWonUnit(summary.share)}',
-            style: const TextStyle(fontSize: 12.5, color: AppColors.steel),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+                fontSize: compact ? 11.5 : 12.5, color: AppColors.steel),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: compact ? 10 : 16),
           if (outgoing.isEmpty && incoming.isEmpty)
             const Row(
               children: [
@@ -167,8 +171,9 @@ class _HeadlineLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = isCompact(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.only(bottom: compact ? 5 : 8),
       child: Row(
         children: [
           Expanded(
@@ -176,19 +181,20 @@ class _HeadlineLine extends StatelessWidget {
               '$prefix $target',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 14,
+              style: TextStyle(
+                fontSize: compact ? 13 : 14,
                 fontWeight: FontWeight.w600,
                 color: AppColors.snow,
               ),
             ),
           ),
-          const SizedBox(width: 10),
-          Money(amount, size: 16, color: color),
           const SizedBox(width: 8),
+          Money(amount, size: compact ? 14 : 16, color: color),
+          SizedBox(width: compact ? 5 : 8),
           Text(
             suffix,
-            style: const TextStyle(fontSize: 11.5, color: AppColors.steel),
+            style: TextStyle(
+                fontSize: compact ? 10.5 : 11.5, color: AppColors.steel),
           ),
         ],
       ),
@@ -276,23 +282,27 @@ class _CreditorGroup extends StatelessWidget {
     final pending = legs.where((l) => !l.settled).toList();
     final pendingTotal = pending.fold(0, (s, l) => s + l.amount);
 
+    final compact = isCompact(context);
     return PanelCard(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 10 : 16,
+        vertical: compact ? 9 : 14,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.north_east, size: 15, color: AppColors.danger),
+              const Icon(Icons.north_east, size: 14, color: AppColors.danger),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   '${project.nameOf(creditorId)} 에게',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Segoe UI',
-                    fontSize: 15,
+                    fontSize: compact ? 14 : 15,
                     fontWeight: FontWeight.w700,
                     color: AppColors.snow,
                   ),
@@ -300,24 +310,24 @@ class _CreditorGroup extends StatelessWidget {
               ),
               Money(
                 pendingTotal,
-                size: 16,
+                size: compact ? 14.5 : 16,
                 color: pendingTotal > 0
                     ? AppColors.danger
                     : AppColors.signalGreen,
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             pending.isEmpty
                 ? '${legs.length}건 전부 입금 완료'
                 : '미입금 ${pending.length}건 / 전체 ${legs.length}건',
             style: TextStyle(
-              fontSize: 11.5,
+              fontSize: compact ? 10.5 : 11.5,
               color: pending.isEmpty ? AppColors.signalGreen : AppColors.steel,
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: compact ? 8 : 12),
           for (final leg in legs)
             _LegRow(
               controller: controller,
@@ -330,7 +340,9 @@ class _CreditorGroup extends StatelessWidget {
             Align(
               alignment: Alignment.centerRight,
               child: GhostButton(
-                label: '${pending.length}건 한번에 입금 완료',
+                label: compact
+                    ? '${pending.length}건 한번에'
+                    : '${pending.length}건 한번에 입금 완료',
                 icon: Icons.done_all,
                 dense: true,
                 onTap: () {
@@ -420,24 +432,28 @@ class _DebtorGroup extends StatelessWidget {
     final pending = legs.where((l) => !l.settled).toList();
     final pendingTotal = pending.fold(0, (s, l) => s + l.amount);
 
+    final compact = isCompact(context);
     return PanelCard(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 10 : 16,
+        vertical: compact ? 9 : 14,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               const Icon(Icons.south_west,
-                  size: 15, color: AppColors.signalGreen),
+                  size: 14, color: AppColors.signalGreen),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   '${project.nameOf(debtorId)} 에게서',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Segoe UI',
-                    fontSize: 15,
+                    fontSize: compact ? 14 : 15,
                     fontWeight: FontWeight.w700,
                     color: AppColors.snow,
                   ),
@@ -445,14 +461,14 @@ class _DebtorGroup extends StatelessWidget {
               ),
               Money(
                 pendingTotal,
-                size: 16,
+                size: compact ? 14.5 : 16,
                 color: pendingTotal > 0
                     ? AppColors.signalGreen
                     : AppColors.steel,
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: compact ? 8 : 12),
           for (final leg in legs)
             _LegRow(
               controller: controller,
@@ -486,10 +502,14 @@ class _LegRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settled = leg.settled;
+    final compact = isCompact(context);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      margin: EdgeInsets.only(bottom: compact ? 5 : 8),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 9 : 12,
+        vertical: compact ? 7 : 10,
+      ),
       decoration: BoxDecoration(
         color: AppColors.abyss,
         border: Border.all(
@@ -499,79 +519,105 @@ class _LegRow extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
+      // 좁은 화면에서는 한 줄에 [제목·금액·버튼]을 다 넣으면 제목이 몇 글자로 뭉개진다.
+      // 그래서 모바일은 2줄로 쪼갠다 — 위: 제목+금액 / 아래: 근거+버튼.
+      child: compact
+          ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Flexible(
-                      child: Text(
-                        leg.expenseTitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w600,
-                          color:
-                              settled ? AppColors.steel : AppColors.snow,
-                          decoration:
-                              settled ? TextDecoration.lineThrough : null,
-                        ),
-                      ),
-                    ),
+                    Expanded(child: _title(settled, compact)),
                     const SizedBox(width: 8),
-                    Text(
-                      formatDay(leg.createdAt),
-                      style: const TextStyle(
-                          fontFamily: 'Consolas',
-                          fontSize: 11,
-                          color: AppColors.steel),
+                    Money(
+                      leg.amount,
+                      size: 13,
+                      color: settled ? AppColors.steel : AppColors.snow,
                     ),
                   ],
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  '${formatWonUnit(leg.expenseAmount)} ÷ ${leg.participantCount}명'
-                  '${settled ? ' · 정산 완료' : ''}',
-                  style: const TextStyle(
-                      fontFamily: 'Consolas',
-                      fontSize: 11,
-                      color: AppColors.steel),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(child: _meta(settled, compact)),
+                    const SizedBox(width: 8),
+                    _actionButton(context, settled, compact),
+                  ],
                 ),
               ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          Money(
-            leg.amount,
-            size: 14,
-            color: settled ? AppColors.steel : AppColors.snow,
-          ),
-          const SizedBox(width: 10),
-          if (settled)
-            GhostButton(
-              label: '취소',
-              icon: Icons.undo,
-              dense: true,
-              color: AppColors.warning,
-              onTap: () =>
-                  controller.setLegSettled(leg.expenseId, leg.debtorId, false),
             )
-          else
-            PrimaryButton(
-              label: counterpartLabel ?? '입금했습니다',
-              icon: Icons.check,
-              dense: true,
-              onTap: () {
-                controller.setLegSettled(leg.expenseId, leg.debtorId, true);
-                showToast(context, '${leg.expenseTitle} 정산 처리');
-              },
+          : Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _title(settled, compact),
+                      const SizedBox(height: 3),
+                      _meta(settled, compact),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Money(
+                  leg.amount,
+                  size: 14,
+                  color: settled ? AppColors.steel : AppColors.snow,
+                ),
+                const SizedBox(width: 10),
+                _actionButton(context, settled, compact),
+              ],
             ),
-        ],
-      ),
+    );
+  }
+
+  Widget _title(bool settled, bool compact) => Text(
+        leg.expenseTitle,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: compact ? 12.5 : 13.5,
+          fontWeight: FontWeight.w600,
+          color: settled ? AppColors.steel : AppColors.snow,
+          decoration: settled ? TextDecoration.lineThrough : null,
+        ),
+      );
+
+  Widget _meta(bool settled, bool compact) => Text(
+        '${formatDay(leg.createdAt)} · '
+        '${formatWonUnit(leg.expenseAmount)} ÷ ${leg.participantCount}명'
+        '${settled ? ' · 완료' : ''}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontFamily: 'Consolas',
+          fontSize: compact ? 10 : 11,
+          color: AppColors.steel,
+        ),
+      );
+
+  Widget _actionButton(BuildContext context, bool settled, bool compact) {
+    if (settled) {
+      return GhostButton(
+        label: '취소',
+        icon: compact ? null : Icons.undo,
+        dense: true,
+        color: AppColors.warning,
+        onTap: () =>
+            controller.setLegSettled(leg.expenseId, leg.debtorId, false),
+      );
+    }
+    return PrimaryButton(
+      // 모바일에선 버튼이 화면을 다 먹지 않게 짧게.
+      label: compact
+          ? (counterpartLabel == null ? '입금' : '확인')
+          : (counterpartLabel ?? '입금했습니다'),
+      icon: Icons.check,
+      dense: true,
+      onTap: () {
+        controller.setLegSettled(leg.expenseId, leg.debtorId, true);
+        showToast(context, '${leg.expenseTitle} 정산 처리');
+      },
     );
   }
 }

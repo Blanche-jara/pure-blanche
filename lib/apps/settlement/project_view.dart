@@ -70,12 +70,16 @@ class _ProjectViewState extends State<ProjectView> {
       );
     }
 
-    final wide = MediaQuery.of(context).size.width >= 768;
     final flows = pairFlows(p);
     final remaining = flows.fold(0, (s, f) => s + f.amount);
 
+    final compact = isCompact(context);
+
     return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: wide ? 40 : 16, vertical: 24),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 40,
+        vertical: compact ? 14 : 24,
+      ),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1100),
@@ -99,7 +103,7 @@ class _ProjectViewState extends State<ProjectView> {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontFamily: 'Segoe UI',
-                        fontSize: wide ? 26 : 20,
+                        fontSize: compact ? 19 : 26,
                         fontWeight: FontWeight.w700,
                         letterSpacing: -0.6,
                         color: AppColors.snow,
@@ -128,7 +132,7 @@ class _ProjectViewState extends State<ProjectView> {
                   ],
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: compact ? 9 : 12),
 
               // ── 공유 상태 / 에러 ──
               ShareBanner(project: p),
@@ -140,51 +144,87 @@ class _ProjectViewState extends State<ProjectView> {
                   onRetry: widget.controller.refresh,
                 ),
               ],
-              const SizedBox(height: 16),
+              SizedBox(height: compact ? 10 : 16),
 
-              // ── 요약 스탯 ──
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  _Stat(
-                    label: '총 지출',
-                    value: formatWonUnit(totalSpent(p)),
-                    sub: '${p.expenses.length}건',
-                    width: wide ? 240 : double.infinity,
+              // ── 요약 스탯 ── 모바일은 한 줄에 3칸으로 눌러 담는다.
+              if (compact)
+                PanelCard(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Column(
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _MiniStat(
+                            label: '총 지출',
+                            value: formatWon(totalSpent(p)),
+                            sub: '${p.expenses.length}건',
+                          ),
+                          _MiniStat(
+                            label: '남은 송금',
+                            value: formatWon(remaining),
+                            sub: '${flows.length}건',
+                            accent: flows.isEmpty
+                                ? AppColors.signalGreen
+                                : AppColors.warning,
+                          ),
+                          _MiniStat(
+                            label: '인원',
+                            value: '${p.members.length}',
+                            sub: '${(settledRatio(p) * 100).round()}% 정산',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 9),
+                      ProgressBar(value: settledRatio(p), height: 4),
+                    ],
                   ),
-                  _Stat(
-                    label: '남은 송금',
-                    value: formatWonUnit(remaining),
-                    sub: '${flows.length}건',
-                    accent: flows.isEmpty
-                        ? AppColors.signalGreen
-                        : AppColors.warning,
-                    width: wide ? 240 : double.infinity,
-                  ),
-                  _Stat(
-                    label: '인원',
-                    value: '${p.members.length}명',
-                    sub: p.members.map((m) => m.name).join(', '),
-                    width: wide ? 300 : double.infinity,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(child: ProgressBar(value: settledRatio(p))),
-                  const SizedBox(width: 12),
-                  Text(
-                    '${(settledRatio(p) * 100).round()}% 정산됨',
-                    style: const TextStyle(
-                        fontFamily: 'Consolas',
-                        fontSize: 12,
-                        color: AppColors.steel),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
+                )
+              else ...[
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    _Stat(
+                      label: '총 지출',
+                      value: formatWonUnit(totalSpent(p)),
+                      sub: '${p.expenses.length}건',
+                      width: 240,
+                    ),
+                    _Stat(
+                      label: '남은 송금',
+                      value: formatWonUnit(remaining),
+                      sub: '${flows.length}건',
+                      accent: flows.isEmpty
+                          ? AppColors.signalGreen
+                          : AppColors.warning,
+                      width: 240,
+                    ),
+                    _Stat(
+                      label: '인원',
+                      value: '${p.members.length}명',
+                      sub: p.members.map((m) => m.name).join(', '),
+                      width: 300,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(child: ProgressBar(value: settledRatio(p))),
+                    const SizedBox(width: 12),
+                    Text(
+                      '${(settledRatio(p) * 100).round()}% 정산됨',
+                      style: const TextStyle(
+                          fontFamily: 'Consolas',
+                          fontSize: 12,
+                          color: AppColors.steel),
+                    ),
+                  ],
+                ),
+              ],
+              SizedBox(height: compact ? 14 : 24),
 
               // ── 탭 ──
               _TabBar(
@@ -197,7 +237,7 @@ class _ProjectViewState extends State<ProjectView> {
                 ],
                 onChanged: (i) => setState(() => _tab = i),
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: compact ? 14 : 20),
 
               if (_tab == 0)
                 ExpensesTab(controller: widget.controller, project: p)
@@ -256,13 +296,71 @@ class _ErrorBanner extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           GhostButton(
-            label: '다시 불러오기',
+            label: isCompact(context) ? '재시도' : '다시 불러오기',
             dense: true,
             color: AppColors.danger,
             onTap: onRetry,
           ),
           const SizedBox(width: 6),
           GhostButton(label: '닫기', dense: true, onTap: onDismiss),
+        ],
+      ),
+    );
+  }
+}
+
+/// 모바일 요약 스탯 한 칸. 세 개가 한 줄을 3등분한다.
+class _MiniStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final String sub;
+  final Color accent;
+
+  const _MiniStat({
+    required this.label,
+    required this.value,
+    required this.sub,
+    this.accent = AppColors.snow,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.8,
+              color: AppColors.steel,
+            ),
+          ),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              maxLines: 1,
+              style: TextStyle(
+                fontFamily: 'Consolas',
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: accent,
+              ),
+            ),
+          ),
+          Text(
+            sub,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 10.5, color: AppColors.parchment),
+          ),
         ],
       ),
     );
@@ -395,7 +493,10 @@ class _TabButtonState extends State<_TabButton> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: EdgeInsets.symmetric(
+            horizontal: pick(context, 11.0, 16.0),
+            vertical: pick(context, 9.0, 12.0),
+          ),
           decoration: BoxDecoration(
             border: Border(
               bottom: BorderSide(
@@ -410,7 +511,7 @@ class _TabButtonState extends State<_TabButton> {
               Text(
                 widget.label,
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: pick(context, 13.0, 14.0),
                   fontWeight: on ? FontWeight.w700 : FontWeight.w500,
                   color: fg,
                 ),
