@@ -5,6 +5,13 @@
 /// JSON 직렬화하며, 그대로 백엔드(D1) 전송에도 쓸 수 있는 형태다.
 library;
 
+/// 저장/전송된 시각 문자열을 **로컬 시간** [DateTime] 으로 되돌린다.
+///
+/// 로컬 저장분은 `DateTime.now().toIso8601String()`(로컬, 오프셋 없음),
+/// 서버 응답은 UTC ISO8601(`…Z`)이라 그대로 파싱하면 9시간이 어긋난다.
+/// `toLocal()` 은 로컬로 파싱된 값에는 아무 영향이 없다.
+DateTime parseTime(String raw) => DateTime.parse(raw).toLocal();
+
 /// 정산 참여자 한 명.
 class Member {
   final String id;
@@ -80,7 +87,7 @@ class Expense {
         payerId: j['payerId'] as String,
         participantIds:
             (j['participantIds'] as List).map((e) => e as String).toList(),
-        createdAt: DateTime.parse(j['createdAt'] as String),
+        createdAt: parseTime(j['createdAt'] as String),
       );
 }
 
@@ -118,13 +125,18 @@ class Transfer {
         toId: j['toId'] as String,
         amount: (j['amount'] as num).toInt(),
         memo: (j['memo'] as String?) ?? '',
-        createdAt: DateTime.parse(j['createdAt'] as String),
+        createdAt: parseTime(j['createdAt'] as String),
       );
 }
 
 /// 정산 프로젝트 하나(= 한 번의 모임/여행).
 class SettlementProject {
   final String id;
+
+  /// 서버 공유 코드(8자). 로컬 전용 프로젝트는 null.
+  /// 이 값이 있으면 `#/settlement/<code>` 링크로 다른 사람과 공유된다.
+  final String? code;
+
   final String name;
   final DateTime createdAt;
   final List<Member> members;
@@ -143,6 +155,7 @@ class SettlementProject {
     required this.expenses,
     required this.transfers,
     required this.settledLegs,
+    this.code,
   });
 
   factory SettlementProject.create({
@@ -170,6 +183,7 @@ class SettlementProject {
   }) =>
       SettlementProject(
         id: id,
+        code: code,
         name: name ?? this.name,
         createdAt: createdAt,
         members: members ?? this.members,
@@ -177,6 +191,9 @@ class SettlementProject {
         transfers: transfers ?? this.transfers,
         settledLegs: settledLegs ?? this.settledLegs,
       );
+
+  /// 서버와 공유되는 프로젝트인지.
+  bool get isShared => code != null;
 
   /// [Member.id] → 이름. 없는 id는 '(삭제됨)'.
   String nameOf(String memberId) {
@@ -188,6 +205,7 @@ class SettlementProject {
 
   Map<String, dynamic> toJson() => {
         'id': id,
+        if (code != null) 'code': code,
         'name': name,
         'createdAt': createdAt.toIso8601String(),
         'members': members.map((m) => m.toJson()).toList(),
@@ -199,8 +217,9 @@ class SettlementProject {
   factory SettlementProject.fromJson(Map<String, dynamic> j) =>
       SettlementProject(
         id: j['id'] as String,
+        code: j['code'] as String?,
         name: j['name'] as String,
-        createdAt: DateTime.parse(j['createdAt'] as String),
+        createdAt: parseTime(j['createdAt'] as String),
         members: (j['members'] as List)
             .map((e) => Member.fromJson(e as Map<String, dynamic>))
             .toList(),

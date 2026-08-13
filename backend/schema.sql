@@ -42,3 +42,58 @@ CREATE TABLE IF NOT EXISTS wg_answers (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_wg_variant_day ON wg_answers(variant, day);
+
+-- ── 정산표 (docs/SETTLEMENT_BACKEND.md) ────────────────────────────────
+-- 공유 코드(code)를 아는 사람이 함께 편집하는 정산 원장.
+-- 분할·상계 계산은 전부 클라이언트가 하고, 서버는 원장만 보관한다.
+CREATE TABLE IF NOT EXISTS settle_projects (
+  id         TEXT PRIMARY KEY,
+  code       TEXT NOT NULL UNIQUE,   -- 공유 코드 8자
+  name       TEXT NOT NULL,
+  owner_hash TEXT,                   -- SHA-256(ownerToken). 프로젝트 삭제 권한 확인용
+  ip_hash    TEXT,                   -- 생성자 IP 해시 (rate limit)
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_sp_code   ON settle_projects(code);
+CREATE INDEX IF NOT EXISTS idx_sp_iphash ON settle_projects(ip_hash, created_at);
+
+CREATE TABLE IF NOT EXISTS settle_members (
+  id         TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  name       TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0   -- 입력 순서 보존(나머지 배분이 이 순서를 따름)
+);
+CREATE INDEX IF NOT EXISTS idx_sm_project ON settle_members(project_id, sort_order);
+
+CREATE TABLE IF NOT EXISTS settle_expenses (
+  id           TEXT PRIMARY KEY,
+  project_id   TEXT NOT NULL,
+  title        TEXT NOT NULL,
+  amount       INTEGER NOT NULL,
+  payer_id     TEXT NOT NULL,
+  participants TEXT NOT NULL,             -- JSON 배열 (member id)
+  created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_se_project ON settle_expenses(project_id, created_at);
+
+CREATE TABLE IF NOT EXISTS settle_transfers (
+  id         TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  from_id    TEXT NOT NULL,
+  to_id      TEXT NOT NULL,
+  amount     INTEGER NOT NULL,
+  memo       TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_st_project ON settle_transfers(project_id, created_at);
+
+-- "입금했습니다" 처리 기록. 한 지출에 대한 한 채무자의 정산 완료 표시.
+CREATE TABLE IF NOT EXISTS settle_legs (
+  project_id TEXT NOT NULL,
+  expense_id TEXT NOT NULL,
+  debtor_id  TEXT NOT NULL,
+  settled_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (project_id, expense_id, debtor_id)
+);
+CREATE INDEX IF NOT EXISTS idx_sl_project ON settle_legs(project_id);

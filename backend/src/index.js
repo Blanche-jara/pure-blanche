@@ -1,24 +1,20 @@
 /**
- * Pure Blanche 방명록 API — Cloudflare Worker (ES module).
+ * Pure Blanche API — Cloudflare Worker (ES module).
  *
- * 계약: docs/GUESTBOOK_BACKEND.md (이 문서가 정답).
+ * 계약: docs/GUESTBOOK_BACKEND.md (방명록·통계), docs/SETTLEMENT_BACKEND.md (정산표).
  *   - GET  /api/guestbook        → 200 {messages:[{id,name,message,created_at}]} (id DESC, ≤100)
  *   - POST /api/guestbook        → 201 {message:{...}}  / 4xx,5xx {error,detail}
+ *   - /api/settlement/**         → 정산표 (settlement.js)
  *   - GET  / 또는 /health        → 200 {ok:true,service:"pure-blanche-guestbook"}
  *   - OPTIONS                    → 204 (CORS preflight)
  *
- * D1 바인딩: env.DB   /   IP_SALT: Worker secret.
+ * D1 바인딩: env.DB   /   IP_SALT, ADMIN_TOKEN: Worker secret.
  */
 
-const SERVICE = "pure-blanche-guestbook";
+import { corsHeaders, errorResponse, ipHash, isAdmin, json } from "./common.js";
+import { routeSettlement } from "./settlement.js";
 
-// 허용 Origin 목록. localhost/127.0.0.1 은 임의 포트를 허용한다.
-const EXACT_ORIGINS = new Set([
-  "https://pure-blanche.com",
-  "https://www.pure-blanche.com",
-]);
-const LOCAL_ORIGIN_RE = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
-const DEFAULT_ORIGIN = "https://pure-blanche.com";
+const SERVICE = "pure-blanche-guestbook";
 
 // 스팸(링크) 탐지 규칙.
 const SPAM_RES = [/https?:\/\//i, /\bwww\.\w/i, /\[url[=\]]/i];
@@ -38,70 +34,10 @@ const WG_VARIANTS = new Set(["kakao5", "kakao7", "kordle6", "kordle12"]);
 // KST(UTC+9) 기준 오늘 날짜 SQL 식.
 const KST_TODAY = "date('now','+9 hours')";
 
-// ── CORS ──────────────────────────────────────────────────────────────
-function resolveOrigin(request) {
-  const origin = request.headers.get("Origin");
-  if (origin && (EXACT_ORIGINS.has(origin) || LOCAL_ORIGIN_RE.test(origin))) {
-    return origin;
-  }
-  return DEFAULT_ORIGIN;
-}
-
-function corsHeaders(request) {
-  return {
-    "Access-Control-Allow-Origin": resolveOrigin(request),
-    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    Vary: "Origin",
-  };
-}
-
-function json(body, status, request) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      ...corsHeaders(request),
-    },
-  });
-}
-
-function errorResponse(status, code, detail, request) {
-  return json({ error: code, detail }, status, request);
-}
-
-// ── 유틸 ──────────────────────────────────────────────────────────────
-async function ipHash(env, request) {
-  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
-  const salt = env.IP_SALT || "dev-salt"; // 로컬 개발 fallback. 프로덕션은 secret 주입.
-  const data = new TextEncoder().encode(`${salt}:${ip}`);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return [...new Uint8Array(digest)]
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
+// CORS / JSON 응답 / IP 해시 / 관리자 인증은 common.js 로 옮겼다(정산표와 공유).
 
 function isSpam(text) {
   return SPAM_RES.some((re) => re.test(text));
-}
-
-// ── 관리자 인증 ───────────────────────────────────────────────────────
-// 길이를 먼저 비교하므로 길이는 노출되나, 192bit+ 랜덤 토큰엔 무의미.
-function safeEqual(a, b) {
-  if (typeof a !== "string" || typeof b !== "string") return false;
-  if (a.length !== b.length) return false;
-  let r = 0;
-  for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return r === 0;
-}
-
-// Authorization: Bearer <ADMIN_TOKEN> 가 Worker secret 과 일치하면 관리자.
-function isAdmin(env, request) {
-  const expected = env.ADMIN_TOKEN;
-  if (!expected) return false; // 시크릿 미설정 시 관리자 기능 비활성(안전 기본값).
-  const auth = request.headers.get("Authorization") || "";
-  const m = auth.match(/^Bearer\s+(.+)$/i);
-  return m ? safeEqual(m[1], expected) : false;
 }
 
 // ── 핸들러 ────────────────────────────────────────────────────────────
@@ -378,6 +314,12 @@ export default {
       }
       if (path === "/api/stats" && request.method === "GET") {
         return await handleStats(env, request);
+      }
+
+      // 정산표. 맡을 경로가 아니면 null 을 돌려주므로 아래 404로 떨어진다.
+      if (path.startsWith("/api/settlement")) {
+        const res = await routeSettlement(env, request, path);
+        if (res) return res;
       }
 
       return errorResponse(404, "not_found", "요청하신 경로를 찾을 수 없습니다.", request);
