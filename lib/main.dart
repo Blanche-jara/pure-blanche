@@ -12,6 +12,7 @@ import 'apps/whos_the_nut/whos_the_nut_app.dart';
 import 'apps/icm_split/icm_split_app.dart';
 import 'apps/safe_link/safe_link_app.dart';
 import 'apps/cannon/cannon_app.dart';
+import 'apps/settlement/settlement_app.dart';
 
 void main() {
   runApp(const PureBlancheApp());
@@ -74,6 +75,11 @@ class PureBlancheApp extends StatelessWidget {
               title: 'THE CANNON',
               trackId: 'cannon',
               child: CannonApp(),
+            ),
+        // 개발 중: 아직 /code 카드에 노출하지 않는다(#/settlement 로 직접 접근).
+        '/settlement': (_) => const AppWrapper(
+              title: '정산표',
+              child: SettlementApp(),
             ),
         '/app/word-guesser': (_) => const HtmlAppPage(
               title: 'Word Guesser',
