@@ -28,6 +28,7 @@ const DAILY_LIMIT = 20;
 const TRACKED_PAGES = new Set([
   "jara-holdem", "roulette", "whos-the-nut", "icm-split", "safe-link",
   "cannon", "jamakase", "birthday", "word-guesser", "word-finder",
+  "smtm",
 ]);
 // Word Guesser 변형.
 const WG_VARIANTS = new Set(["kakao5", "kakao7", "kordle6", "kordle12"]);

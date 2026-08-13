@@ -37,7 +37,8 @@ class PureBlancheApp extends StatelessWidget {
         return MaterialPageRoute(
           settings: settings,
           builder: (_) => AppWrapper(
-            title: '정산표',
+            title: 'SMTM',
+            trackId: 'smtm',
             child: SettlementApp(code: m.group(1)),
           ),
         );
@@ -90,9 +91,9 @@ class PureBlancheApp extends StatelessWidget {
               trackId: 'cannon',
               child: CannonApp(),
             ),
-        // 개발 중: 아직 /code 카드에 노출하지 않는다(#/settlement 로 직접 접근).
         '/settlement': (_) => const AppWrapper(
-              title: '정산표',
+              title: 'SMTM',
+              trackId: 'smtm',
               child: SettlementApp(),
             ),
         '/app/word-guesser': (_) => const HtmlAppPage(

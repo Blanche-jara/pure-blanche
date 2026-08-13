@@ -263,7 +263,7 @@ class _ProjectListView extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               const Text(
-                '정산표',
+                'SMTM',
                 style: TextStyle(
                   fontFamily: 'Segoe UI',
                   fontSize: 34,
