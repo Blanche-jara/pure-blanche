@@ -283,6 +283,23 @@ const _projects = [
     type: 'web',
     route: '/app/word-finder',
   ),
+  _ProjectData(
+    title: 'SMTM',
+    subtitle: 'settlement',
+    description:
+        '모임 정산표. 누가 얼마를 결제했는지만 적으면 누가 누구에게 얼마를 보내야 하는지 '
+        '정리해준다. 링크 하나로 참여자 전원이 함께 쓰고, 건별로 입금 처리한다.',
+    techTags: ['Flutter', 'Dart', 'Cloudflare Workers', 'D1'],
+    features: [
+      '균등분할 → 쌍별 상계로 송금 정리',
+      '건별 "입금했습니다" 즉시 반영',
+      '부분 입금·직접 송금 차감',
+      '공유 링크로 함께 편집',
+    ],
+    icon: Icons.receipt_long_outlined,
+    type: 'flutter',
+    route: '/settlement',
+  ),
 ];
 
 // ---------------------------------------------------------------------------

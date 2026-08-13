@@ -1,15 +1,15 @@
 # Pure Blanche — 코드 프로젝트 서브앱 레퍼런스
 
-> `/code`(`CodeProjectsPage`)에 카드로 노출되는 **10개 코드 프로젝트**의 상세 레퍼런스다.
+> `/code`(`CodeProjectsPage`)에 카드로 노출되는 **11개 코드 프로젝트**의 상세 레퍼런스다.
 > 출처: `lib/pages/code_projects_page.dart`(카드 데이터) + `lib/main.dart`(라우트) + 각 앱 디렉터리.
 > 라우팅·디자인 등 사이트 전체 구조는 [ARCHITECTURE.md](./ARCHITECTURE.md)(특히 3장 라우트, 6장 서브앱 요약) 참조.
 > 코드와 이 문서가 다르면 코드가 정답이며, 발견 즉시 고친다.
 
 ## 개요
 
-총 10개. 실행 방식은 두 가지다.
+총 11개. 실행 방식은 두 가지다.
 
-- **Flutter 인앱(6개)**: `lib/apps/<name>/`의 Dart 위젯을 `AppWrapper`(상단 뒤로가기 바)로 감싸 라우트에 직접 연결.
+- **Flutter 인앱(7개)**: `lib/apps/<name>/`의 Dart 위젯을 `AppWrapper`(상단 뒤로가기 바)로 감싸 라우트에 직접 연결.
 - **HTML/사전빌드 임베드(4개)**: `web/apps/<name>/`의 정적 산출물을 `HtmlAppPage`(`lib/apps/web_embed/html_app_page.dart`)가 `iframe`(HtmlElementView)으로 로드.
 
 | 앱 | 라우트 | 타입 | 위치 | 한 줄 목적 | 외부 링크 |
@@ -24,6 +24,7 @@
 | 제 25회 자라 생일 선물 리스트 | `/app/birthday` | Web | `web/apps/birthday/` | 생일 선물 목록 & 감사 페이지 | — |
 | Word Guesser | `/app/word-guesser` | Web(사전빌드 Flutter) | `web/apps/word-guesser/` | 한글 워들(풀어쓰기) 솔버 | — |
 | Word Finder | `/app/word-finder` | Web(사전빌드 Flutter) | `web/apps/word-finder/` | 꼬맨틀(한국어 Semantle) 추측 보조기 | — |
+| SMTM | `/settlement` | Flutter + D1 | `lib/apps/settlement/` | 모임 정산표 — 누가 누구에게 얼마 보낼지 정리 | — |
 
 ---
 
@@ -91,6 +92,38 @@
 - **기술/패키지**: Flutter, Dart, `CustomPainter`(주사위 렌더), 스트림 친화적 애니메이션.
 - **주요 파일 구조** (`lib/apps/cannon/`): `cannon_app.dart`(단일 파일).
 - **다운로드**: Google Drive EXE (위 표, `downloadLabel: 'EXE'`).
+
+---
+
+### SMTM — `/settlement`
+
+모임 정산표. 유일하게 **서버(D1)를 쓰는 서브앱**이며, 라우트도 `/app/*` 가 아닌 `/settlement` 다.
+공유 링크는 `/settlement/<코드 8자>` → `onGenerateRoute` 가 받는다.
+
+**계산 규칙** (`engine.dart`, 전부 클라이언트)
+1. 지출 한 건을 참여자 수로 균등분할. **1원 단위 나머지는 결제자가 흡수**해
+   나머지 사람은 딱 떨어지는 금액을 갚는다 (97,000÷3 → 결제자 32,334 / 나머지 32,333).
+2. 결제자를 뺀 참여자마다 `채무 줄(DebtLeg)` 생성. 키는 `<expenseId>::<debtorId>`.
+3. **쌍별 상계**: `net(A→B) = 미정산(A→B) − 미정산(B→A) − 직접송금순액(A→B)`.
+   음수면 화살표가 뒤집힌다(과다 송금 → 돌려받을 돈).
+
+**화면** — 3탭
+| 탭 | 내용 |
+|----|------|
+| 지출 기록 | 지출 목록(인원별 부담액 칩) + 직접 송금 목록. 추가/수정/삭제 |
+| 통합 정산 | 쌍별 상계 화살표 + 상계 근거 한 줄 + 인원 요약 카드 |
+| 인원별 | 그 사람이 보낼/받을 돈을 **건별로** 나열. 건마다 `입금했습니다` / `취소` |
+
+**2모드**
+- **로컬**: localStorage(`pb_settlement_v1`). 서버로 나가지 않는다.
+- **공유**: 서버 D1. 코드를 아는 사람이 함께 편집. 삭제만 `ownerToken`(`pb_settlement_shared_v1`)·관리자.
+- UI는 `SettlementController` 인터페이스만 알아서 두 모드를 구분하지 않는다
+  (`LocalSettlementController` / `RemoteSettlementController`).
+- 로컬 → 공유 전환은 목록 카드의 ↗ 버튼(인원→지출→송금→입금처리 순으로 서버에 재현).
+
+**계약·검증**: [SETTLEMENT_BACKEND.md](./SETTLEMENT_BACKEND.md),
+`test/settlement_engine_test.dart`(14), `test/settlement_service_integration_test.dart`(Worker 왕복),
+`backend/smoke_settlement.sh`(API 35).
 
 ---
 

@@ -7,8 +7,9 @@ Blanche의 유틸리티 집합소 웹사이트. Flutter Web으로 구축.
 > 빠른 참조용 하네스이며, 충돌 시 `docs/`가 정답이다.
 > - `docs/README.md` — 문서 인덱스 (여기부터 읽기)
 > - `docs/ARCHITECTURE.md` — 라우팅·페이지·서브앱·디자인·배포 전체 구조
-> - `docs/APPS.md` — 코드 프로젝트 10개 서브앱 상세 레퍼런스
+> - `docs/APPS.md` — 코드 프로젝트 11개 서브앱 상세 레퍼런스
 > - `docs/GUESTBOOK_BACKEND.md` — 방명록 백엔드 설계 + API 계약
+> - `docs/SETTLEMENT_BACKEND.md` — 정산표 백엔드 설계 + API 계약
 > - `docs/TODO.md` — 작업 로드맵
 
 ## Tech Stack
@@ -21,7 +22,7 @@ Blanche의 유틸리티 집합소 웹사이트. Flutter Web으로 구축.
 - **Design System**: `design/DESIGN.md` 기반 — VoltAgent-inspired dark theme
 - **Deployment**: GitHub Pages + GitHub Actions (`.github/workflows/deploy.yml`)
 - **Domain**: `pure-blanche.com` (Cloudflare DNS → GitHub Pages)
-- **Backend**: 방명록 한정 — Cloudflare Workers + D1 (`api.pure-blanche.com`). 상세: `docs/GUESTBOOK_BACKEND.md`
+- **Backend**: 방명록 + 정산표(공유 모드) — Cloudflare Workers + D1 (`api.pure-blanche.com`). 상세: `docs/GUESTBOOK_BACKEND.md`, `docs/SETTLEMENT_BACKEND.md`
 - **Dependencies**: provider, audioplayers, shared_preferences, intl, web, url_launcher, pointer_interceptor, google_fonts, http, flutter_riverpod, hive/hive_flutter, fl_chart, uuid
 
 ## Design Tokens (Quick Ref)
@@ -53,7 +54,7 @@ pure-blanche/
 │   │   └── app_theme.dart         # ThemeData + 타이포그래피
 │   ├── pages/
 │   │   ├── main_page.dart             # 메인 (히어로 + 3개 네비카드)
-│   │   ├── code_projects_page.dart    # 코드 프로젝트 10개 카드 → 각 앱 실행
+│   │   ├── code_projects_page.dart    # 코드 프로젝트 11개 카드 → 각 앱 실행
 │   │   ├── video_projects_page.dart   # 영상 연대표 (풀페이지 스냅 + 타임라인)
 │   │   └── guestbook_page.dart        # 방명록 (백엔드 연동)
 │   ├── services/                  # 프론트 서비스 레이어 (guestbook_service.dart 등 — 방명록 API 호출)
@@ -65,6 +66,7 @@ pure-blanche/
 │   │   ├── roulette/                  # 자마카세 인원뽑기 룰렛
 │   │   ├── safe_link/                 # It's Safe Link (lz-string redirector)
 │   │   ├── cannon/                    # THE CANNON (주사위 추첨)
+│   │   ├── settlement/                # 정산표(개발 중) — engine/store/controller + 3탭 UI
 │   │   └── web_embed/
 │   │       └── html_app_page.dart         # HTML/사전빌드 프로젝트 iframe 임베드 위젯
 │   └── widgets/
@@ -94,12 +96,13 @@ pure-blanche/
 
 ## Routes
 
-전체 14개 named route (`lib/main.dart`). 코드 프로젝트는 10개(`/app/*`). 앱별 상세는 `docs/APPS.md`.
+전체 15개 named route (`lib/main.dart`) + 공유 정산표용 `onGenerateRoute` 1개.
+코드 프로젝트는 11개(`/app/*` 10개 + `/settlement`). 앱별 상세는 `docs/APPS.md`.
 
 | Path | Page | 설명 |
 |------|------|------|
 | `/` | `MainPage` | 2-page 스냅 스크롤: 히어로 소개 (Page 0) + 3개 네비카드 & 푸터 (Page 1). 첫 접속 시 인트로 영상 재생 (sessionStorage 기반) |
-| `/code` | `CodeProjectsPage` | 코드 프로젝트 10개 카드 → 클릭 시 각 앱 실행 |
+| `/code` | `CodeProjectsPage` | 코드 프로젝트 11개 카드 → 클릭 시 각 앱 실행 |
 | `/video` | `VideoProjectsPage` | 영상 연대표 (7개 시대, 풀페이지 스냅) |
 | `/guestbook` | `GuestbookPage` | 방명록 — Cloudflare Workers + D1 백엔드 연동 (`docs/GUESTBOOK_BACKEND.md`) |
 | `/app/jara-holdem` | `AppWrapper` + `JaraHoldemApp` | 포커 토너먼트 타이머 (Flutter) |
@@ -112,6 +115,8 @@ pure-blanche/
 | `/app/birthday` | `HtmlAppPage` | 자라 생일 선물 리스트 (HTML iframe) |
 | `/app/word-guesser` | `HtmlAppPage` | 한글 워들 솔버 (사전빌드 Flutter Web iframe) |
 | `/app/word-finder` | `HtmlAppPage` | 꼬맨틀(Semantle) 헬퍼 (사전빌드 Flutter Web iframe) |
+| `/settlement` | `AppWrapper` + `SettlementApp` | **SMTM** — 모임 정산표 (Flutter + D1) |
+| `/settlement/<코드>` | 위와 동일(`code:`) | SMTM 공유 링크 (`onGenerateRoute`) |
 
 ## Key Data Files
 
