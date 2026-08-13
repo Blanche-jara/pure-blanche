@@ -46,6 +46,8 @@ Flutter Web 단일 페이지 앱(SPA)으로 만든 **Blanche의 개인 포트폴
 | `/app/birthday` | `HtmlAppPage` | 자라 생일 선물 리스트 (HTML iframe) |
 | `/app/word-guesser` | `HtmlAppPage` | 한글 워들 솔버 (사전빌드된 Flutter Web을 iframe) |
 | `/app/word-finder` | `HtmlAppPage` | Semantle 헬퍼 (사전빌드된 Flutter Web을 iframe) |
+| `/settlement` | `AppWrapper`+`SettlementApp` | **정산표(개발 중)** — 모임 정산. `/code` 카드에는 아직 미노출 |
+| `/settlement/<코드>` | `AppWrapper`+`SettlementApp(code:)` | 공유 정산표 링크. `onGenerateRoute` 로 처리(값이 든 경로라 routes 맵 정확일치로는 못 잡음) |
 
 - **Flutter 인앱 실행**: `AppWrapper`로 감싸 상단 뒤로가기 바 통일.
 - **HTML/사전빌드 임베드**: `HtmlAppPage` → `web/apps/<name>/`의 정적 산출물을 iframe/HtmlElementView로 로드.
@@ -65,7 +67,7 @@ pure-blanche/
 │   ├── apps/                  # 서브앱 6개(Flutter) + app_wrapper + web_embed
 │   ├── widgets/               # nav_bar, page_scaffold, section_header, youtube_player ...
 │   └── services/              # guestbook_service.dart, stats_service.dart
-├── backend/                   # Cloudflare Worker + D1 (방명록 + 접속통계/WG정답 API)
+├── backend/                   # Cloudflare Worker + D1 (방명록 + 접속통계/WG정답 + 정산표 API)
 ├── apps_src/                  # 사전빌드 임베드 앱 소스 (word-guesser) — apps_src/README.md
 ├── web/
 │   ├── index.html, CNAME      # CNAME = pure-blanche.com
@@ -102,6 +104,19 @@ pure-blanche/
   - **접속 통계**: 코드 프로젝트 페이지별 총/오늘/순방문 + Word Guesser "오늘의 정답"(변형별).
 - 상세 명세(API 계약 포함): [GUESTBOOK_BACKEND.md](./GUESTBOOK_BACKEND.md).
 
+### 5.5 정산표 (`lib/apps/settlement/`, 개발 중)
+모임 정산 유틸리티. "누가 결제했는지"만 적으면 누가 누구에게 얼마를 보낼지 계산한다.
+
+- **계산은 전부 클라이언트**(`engine.dart`): 균등분할(1원 나머지는 결제자가 흡수) →
+  채무 줄(leg) 생성 → **쌍별 상계**. `net(A→B) = 미정산(A→B) − 미정산(B→A) − 직접송금순액(A→B)`.
+- **3탭**: 지출 기록 / 통합 정산(화살표 + 인원 요약) / 인원별(건별 목록 + "입금했습니다").
+- **2모드**: 로컬(localStorage) / 공유(서버 D1, `#/settlement/<코드>` 링크).
+  UI는 `SettlementController` 인터페이스만 알고 두 모드를 구분하지 않는다.
+- 서버 계약: [SETTLEMENT_BACKEND.md](./SETTLEMENT_BACKEND.md). 방명록과 같은 Worker·같은 D1.
+- 검증: `test/settlement_engine_test.dart`(엔진 14개),
+  `test/settlement_service_integration_test.dart`(Worker 왕복, 서버 없으면 skip),
+  `backend/smoke_settlement.sh`(API 인수 기준 35개).
+
 ## 6. 서브앱 요약 (`lib/apps/`)
 
 | 디렉터리 | 앱 | 핵심 |
@@ -112,6 +127,7 @@ pure-blanche/
 | `roulette/` | 자마카세 인원뽑기 | 참가자 룰렛 스피너 |
 | `safe_link/` | It's Safe Link | lz-string 압축+hash, 도착지 미리보기 리다이렉트 |
 | `cannon/` | THE CANNON | 주사위 텀블 애니메이션 추첨, CustomPainter |
+| `settlement/` | 정산표(개발 중) | 지출 균등분할 → 쌍별 상계 → 건별 입금 처리. 로컬/서버 공유 2모드 |
 | `web_embed/` | (래퍼) | `html_app_page.dart` — HTML/사전빌드 앱 iframe 임베드 |
 | `app_wrapper.dart` | (래퍼) | 모든 Flutter 서브앱 공통 뒤로가기 바 |
 
