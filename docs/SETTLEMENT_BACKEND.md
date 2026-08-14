@@ -26,6 +26,26 @@
 | **소유자**(`ownerToken` 보유, 생성한 브라우저) | 위 전부 + **프로젝트 삭제** |
 | **관리자**(`ADMIN_TOKEN`) | 전부 + 프로젝트 삭제 |
 
+### 비밀 프로젝트 (암호 잠금)
+
+여행처럼 참여 인원이 정해진 정산은 **링크만으로는 부족**하다. 생성 시 암호를 걸면
+링크를 알아도 암호를 넣어야 열린다.
+
+```
+생성(password 포함) → pass_salt/pass_hash 저장 + accessToken 발급
+링크로 접근 → 401 password_required → POST /unlock {password} → accessToken
+이후 모든 요청 → Authorization: Bearer <accessToken>
+```
+
+- 암호는 **원문을 저장하지 않는다**. 프로젝트마다 다른 솔트로 `PBKDF2-SHA256 100,000회`.
+- `accessToken = SHA-256(IP_SALT + ":access:" + project_id + ":" + pass_hash)`.
+  서버 시크릿이 있어야 만들 수 있고, 암호가 바뀌면 `pass_hash` 가 바뀌어 **예전 열쇠는 저절로 무효**가 된다.
+  덕분에 토큰 테이블이 필요 없다.
+- 잠긴 프로젝트는 **조회도 편집도** 열쇠가 필요하다(읽기만 열어두면 잠금의 의미가 없다).
+  `ownerToken` 과 `ADMIN_TOKEN` 도 열쇠로 통한다.
+- 401 응답에는 정산표 **이름만** 함께 준다 — 암호 입력 화면에 "무엇을 여는 중인지" 보여주기 위해서다.
+- 암호는 잊으면 복구 수단이 없다(관리자 삭제만 가능). UI에서 그 사실을 안내한다.
+
 - `code`: 8자, 혼동 문자를 뺀 알파벳 `abcdefghjkmnpqrstuvwxyz23456789` 에서 무작위.
   추측 저항이 목적이지 기밀은 아니다. **민감한 금액을 다루는 용도로 홍보하지 않는다.**
 - `ownerToken`: 32자 무작위 hex. 서버는 **SHA-256 해시만** 저장(`owner_hash`).
@@ -61,9 +81,12 @@ Base URL은 방명록과 동일(`https://api.pure-blanche.com`, 로컬 `http://l
     "id": "…", "fromId": "…", "toId": "…", "amount": 50000,
     "memo": "계좌이체", "createdAt": "2026-08-13T05:00:00Z"
   }],
+  "locked": false,
   "settledLegs": ["<expenseId>::<debtorId>"]
 }
 ```
+
+- `locked`: 비밀 프로젝트 여부. 잠긴 프로젝트는 열쇠가 있어야 이 객체 자체를 받을 수 있다.
 
 - 모든 시각은 **UTC ISO8601 `…Z`**. 클라이언트가 로컬 시간으로 변환한다.
 - 금액은 **원 단위 정수**. 분할 계산은 전부 클라이언트(`engine.dart`)가 하고,
@@ -74,8 +97,9 @@ Base URL은 방명록과 동일(`https://api.pure-blanche.com`, 로컬 `http://l
 
 | 메서드 | 경로 | 인증 | 본문 | 성공 |
 |--------|------|------|------|------|
-| POST | `/api/settlement` | — | `{name, members:[string]}` | **201** `{project, ownerToken}` |
-| GET | `/api/settlement/:code` | — | — | 200 `{project}` |
+| POST | `/api/settlement` | — | `{name, members:[string], password?}` | **201** `{project, ownerToken, accessToken}` |
+| POST | `/api/settlement/:code/unlock` | — | `{password}` | 200 `{project, accessToken}` / 401 `bad_password` |
+| GET | `/api/settlement/:code` | 잠금 시 필요 | — | 200 `{project}` |
 | PATCH | `/api/settlement/:code` | — | `{name}` | 200 `{project}` |
 | DELETE | `/api/settlement/:code` | 소유자/관리자 | — | 200 `{ok:true, deleted:"<code>"}` |
 | POST | `/api/settlement/:code/members` | — | `{name}` | 200 `{project}` |
@@ -89,6 +113,8 @@ Base URL은 방명록과 동일(`https://api.pure-blanche.com`, 로컬 `http://l
 | PUT | `/api/settlement/:code/legs` | — | `{legs:[{expenseId, debtorId}], settled:bool}` | 200 `{project}` |
 
 - `PUT …/legs` 가 **"입금했습니다"** 다. `settled:false` 면 취소. `legs` 는 1~200개.
+- **비밀 프로젝트**면 `/unlock` 을 뺀 모든 경로가 `Authorization: Bearer <accessToken>` 을 요구한다.
+  없으면 **401 `password_required`** (+ `name`).
 - `PATCH …/expenses/:id` 로 참여자에서 빠진 사람의 입금 처리 기록은 **함께 삭제**된다
   (근거가 사라진 정산 표시를 남기지 않는다). 프론트 `updateExpense` 와 같은 규칙.
 - `DELETE …/expenses/:id` 는 해당 지출의 입금 처리 기록도 함께 지운다.
@@ -103,6 +129,9 @@ Base URL은 방명록과 동일(`https://api.pure-blanche.com`, 로컬 `http://l
 | 400 | `bad_amount` | 금액이 1~99,999,999 정수 아님 | 금액이 올바르지 않습니다. |
 | 400 | `bad_member` | payer/참여자/송금 대상이 이 프로젝트 인원이 아님 | 인원 정보가 올바르지 않습니다. |
 | 400 | `bad_request` | 그 외 형식 오류(빈 참여자, from==to 등) | 요청이 올바르지 않습니다. |
+| 400 | `bad_password` | 암호가 4~32자가 아님(생성 시) | 암호는 4~32자로 입력해주세요. |
+| 401 | `password_required` | 비밀 프로젝트에 열쇠 없이 접근 | 암호가 필요한 정산표입니다. |
+| 401 | `bad_password` | `/unlock` 암호 불일치 | 암호가 올바르지 않습니다. |
 | 401 | `unauthorized` | 소유자/관리자 인증 실패 | 권한이 없습니다. |
 | 404 | `not_found` | 코드/항목 없음 | 정산표를 찾을 수 없습니다. |
 | 409 | `member_in_use` | 지출·송금에 얽힌 인원 삭제 시도 | 지출에 참여한 인원은 삭제할 수 없습니다. |
@@ -121,6 +150,8 @@ CREATE TABLE IF NOT EXISTS settle_projects (
   code       TEXT NOT NULL UNIQUE,
   name       TEXT NOT NULL,
   owner_hash TEXT,                                    -- SHA-256(ownerToken)
+  pass_salt  TEXT,                                    -- 비밀 프로젝트: 솔트(hex). NULL이면 공개
+  pass_hash  TEXT,                                    -- 비밀 프로젝트: PBKDF2-SHA256(암호, 솔트)
   ip_hash    TEXT,                                    -- 생성자 IP 해시(rate limit용)
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -151,6 +182,15 @@ CREATE TABLE IF NOT EXISTS settle_legs (          -- "입금했습니다" 처리
 전부 `IF NOT EXISTS` 라 기존 원격 DB에 `schema.sql` 을 다시 실행해도 안전하다
 (방명록 테이블/데이터는 건드리지 않는다).
 
+> ⚠️ **`pass_salt`/`pass_hash` 는 기존 DB에 자동으로 안 생긴다.** `CREATE TABLE IF NOT EXISTS`
+> 는 이미 있는 테이블에 컬럼을 추가하지 않는다. 이미 `settle_projects` 가 만들어진 DB에는
+> **한 번** 마이그레이션을 돌린다:
+> ```bash
+> npx wrangler d1 execute pure-blanche-guestbook --remote \
+>   --file=./migrate_settlement_password.sql
+> ```
+> 두 번째 실행은 "duplicate column name" 에러가 난다(정상).
+
 ### 4.2 검증 · 상한
 
 | 항목 | 규칙 |
@@ -162,6 +202,7 @@ CREATE TABLE IF NOT EXISTS settle_legs (          -- "입금했습니다" 처리
 | 금액 | 1 ~ 99,999,999 정수 |
 | 참여자 | 1명 이상, 전원이 이 프로젝트 인원 |
 | 송금 메모 | 0~30자 |
+| 암호(비밀 프로젝트) | 4~32자 |
 | 프로젝트당 지출 | 최대 500건 |
 | 프로젝트당 송금 | 최대 500건 |
 

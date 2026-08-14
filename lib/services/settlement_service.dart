@@ -29,31 +29,54 @@ class SettlementService {
   // ─────────────────────────── 프로젝트 ───────────────────────────
 
   /// 새 정산표 생성. 서버가 공유 코드와 소유자 토큰을 발급한다.
+  /// [password] 를 주면 **비밀 프로젝트**가 되고 접근 토큰이 함께 온다.
   Future<CreatedProject> create({
     required String name,
     required List<String> memberNames,
+    String? password,
   }) async {
     final decoded = await _send(
       'POST',
       '/api/settlement',
-      body: {'name': name, 'members': memberNames},
+      body: {
+        'name': name,
+        'members': memberNames,
+        if (password != null && password.isNotEmpty) 'password': password,
+      },
       expect: 201,
     );
-    final project = _projectFrom(decoded);
-    final token = decoded['ownerToken'];
+    final owner = decoded['ownerToken'];
+    final access = decoded['accessToken'];
     return CreatedProject(
-      project: project,
-      ownerToken: token is String ? token : null,
+      project: _projectFrom(decoded),
+      ownerToken: owner is String ? owner : null,
+      accessToken: access is String ? access : null,
     );
   }
 
-  /// 공유 코드로 정산표 조회.
-  Future<SettlementProject> fetch(String code) async =>
-      _projectFrom(await _send('GET', '/api/settlement/$code'));
+  /// 비밀 프로젝트 잠금 해제. 성공하면 이후 요청에 쓸 접근 토큰이 나온다.
+  /// 암호가 틀리면 `bad_password` 코드의 [SettlementException].
+  Future<UnlockResult> unlock(String code, String password) async {
+    final decoded = await _send(
+      'POST',
+      '/api/settlement/$code/unlock',
+      body: {'password': password},
+    );
+    final access = decoded['accessToken'];
+    return UnlockResult(
+      project: _projectFrom(decoded),
+      accessToken: access is String ? access : null,
+    );
+  }
 
-  Future<SettlementProject> rename(String code, String name) async =>
+  /// 공유 코드로 정산표 조회. 비밀 프로젝트면 [token] 이 있어야 한다.
+  Future<SettlementProject> fetch(String code, {String? token}) async =>
+      _projectFrom(await _send('GET', '/api/settlement/$code', token: token));
+
+  Future<SettlementProject> rename(String code, String name,
+          {String? token}) async =>
       _projectFrom(await _send('PATCH', '/api/settlement/$code',
-          body: {'name': name}));
+          body: {'name': name}, token: token));
 
   /// 정산표 삭제. 소유자 토큰(생성한 브라우저)이나 관리자 토큰이 필요하다.
   Future<void> deleteProject(String code, {String? ownerToken}) async {
@@ -62,22 +85,26 @@ class SettlementService {
 
   // ─────────────────────────── 인원 ───────────────────────────
 
-  Future<SettlementProject> addMember(String code, String name) async =>
+  Future<SettlementProject> addMember(String code, String name,
+          {String? token}) async =>
       _projectFrom(await _send('POST', '/api/settlement/$code/members',
-          body: {'name': name}));
+          body: {'name': name}, token: token));
 
   Future<SettlementProject> renameMember(
     String code,
     String memberId,
-    String name,
-  ) async =>
+    String name, {
+    String? token,
+  }) async =>
       _projectFrom(await _send(
           'PATCH', '/api/settlement/$code/members/$memberId',
-          body: {'name': name}));
+          body: {'name': name}, token: token));
 
-  Future<SettlementProject> removeMember(String code, String memberId) async =>
-      _projectFrom(
-          await _send('DELETE', '/api/settlement/$code/members/$memberId'));
+  Future<SettlementProject> removeMember(String code, String memberId,
+          {String? token}) async =>
+      _projectFrom(await _send(
+          'DELETE', '/api/settlement/$code/members/$memberId',
+          token: token));
 
   // ─────────────────────────── 지출 ───────────────────────────
 
@@ -87,13 +114,16 @@ class SettlementService {
     required int amount,
     required String payerId,
     required List<String> participantIds,
+    String? token,
   }) async =>
-      _projectFrom(await _send('POST', '/api/settlement/$code/expenses', body: {
-        'title': title,
-        'amount': amount,
-        'payerId': payerId,
-        'participantIds': participantIds,
-      }));
+      _projectFrom(await _send('POST', '/api/settlement/$code/expenses',
+          token: token,
+          body: {
+            'title': title,
+            'amount': amount,
+            'payerId': payerId,
+            'participantIds': participantIds,
+          }));
 
   Future<SettlementProject> updateExpense(
     String code,
@@ -102,9 +132,11 @@ class SettlementService {
     required int amount,
     required String payerId,
     required List<String> participantIds,
+    String? token,
   }) async =>
       _projectFrom(await _send(
           'PATCH', '/api/settlement/$code/expenses/$expenseId',
+          token: token,
           body: {
             'title': title,
             'amount': amount,
@@ -112,9 +144,11 @@ class SettlementService {
             'participantIds': participantIds,
           }));
 
-  Future<SettlementProject> removeExpense(String code, String expenseId) async =>
-      _projectFrom(
-          await _send('DELETE', '/api/settlement/$code/expenses/$expenseId'));
+  Future<SettlementProject> removeExpense(String code, String expenseId,
+          {String? token}) async =>
+      _projectFrom(await _send(
+          'DELETE', '/api/settlement/$code/expenses/$expenseId',
+          token: token));
 
   // ─────────────────────────── 직접 송금 ───────────────────────────
 
@@ -124,19 +158,22 @@ class SettlementService {
     required String toId,
     required int amount,
     String memo = '',
+    String? token,
   }) async =>
-      _projectFrom(
-          await _send('POST', '/api/settlement/$code/transfers', body: {
-        'fromId': fromId,
-        'toId': toId,
-        'amount': amount,
-        'memo': memo,
-      }));
+      _projectFrom(await _send('POST', '/api/settlement/$code/transfers',
+          token: token,
+          body: {
+            'fromId': fromId,
+            'toId': toId,
+            'amount': amount,
+            'memo': memo,
+          }));
 
-  Future<SettlementProject> removeTransfer(
-          String code, String transferId) async =>
-      _projectFrom(
-          await _send('DELETE', '/api/settlement/$code/transfers/$transferId'));
+  Future<SettlementProject> removeTransfer(String code, String transferId,
+          {String? token}) async =>
+      _projectFrom(await _send(
+          'DELETE', '/api/settlement/$code/transfers/$transferId',
+          token: token));
 
   // ─────────────────────────── 입금 처리 ───────────────────────────
 
@@ -145,14 +182,17 @@ class SettlementService {
     String code, {
     required List<({String expenseId, String debtorId})> legs,
     required bool settled,
+    String? token,
   }) async =>
-      _projectFrom(await _send('PUT', '/api/settlement/$code/legs', body: {
-        'legs': [
-          for (final l in legs)
-            {'expenseId': l.expenseId, 'debtorId': l.debtorId}
-        ],
-        'settled': settled,
-      }));
+      _projectFrom(await _send('PUT', '/api/settlement/$code/legs',
+          token: token,
+          body: {
+            'legs': [
+              for (final l in legs)
+                {'expenseId': l.expenseId, 'debtorId': l.debtorId}
+            ],
+            'settled': settled,
+          }));
 
   // ─────────────────────────── 내부 ───────────────────────────
 
@@ -198,6 +238,7 @@ class SettlementService {
         _detailFromBody(res.bodyBytes) ?? _fallbackMessage(res.statusCode),
         code: _codeFromBody(res.bodyBytes),
         status: res.statusCode,
+        projectName: _nameFromBody(res.bodyBytes),
       );
     } on SettlementException {
       rethrow;
@@ -210,7 +251,7 @@ class SettlementService {
 
   static String _fallbackMessage(int status) => switch (status) {
         404 => '정산표를 찾을 수 없습니다. 링크를 다시 확인해주세요.',
-        401 => '권한이 없습니다.',
+        401 => '암호가 필요합니다.',
         _ => '요청을 처리하지 못했습니다. ($status)',
       };
 
@@ -232,14 +273,34 @@ class SettlementService {
     final code = _decodeBody(bytes)?['error'];
     return code is String ? code : null;
   }
+
+  /// `password_required` 응답이 알려주는 정산표 이름(암호 입력 화면에 띄운다).
+  static String? _nameFromBody(List<int> bytes) {
+    final name = _decodeBody(bytes)?['name'];
+    return name is String && name.isNotEmpty ? name : null;
+  }
 }
 
-/// 생성 결과 — 프로젝트 + 소유자 토큰(이 브라우저에 보관해야 삭제 가능).
+/// 생성 결과 — 프로젝트 + 소유자 토큰(이 브라우저에 보관해야 삭제 가능)
+/// + 비밀 프로젝트라면 접근 토큰.
 class CreatedProject {
   final SettlementProject project;
   final String? ownerToken;
+  final String? accessToken;
 
-  const CreatedProject({required this.project, this.ownerToken});
+  const CreatedProject({
+    required this.project,
+    this.ownerToken,
+    this.accessToken,
+  });
+}
+
+/// 잠금 해제 결과.
+class UnlockResult {
+  final SettlementProject project;
+  final String? accessToken;
+
+  const UnlockResult({required this.project, this.accessToken});
 }
 
 /// 사용자에게 그대로 보여줄 수 있는 한국어 메시지를 담은 예외.
@@ -251,7 +312,18 @@ class SettlementException implements Exception {
 
   final int? status;
 
-  const SettlementException(this.message, {this.code, this.status});
+  /// 잠긴 정산표의 이름(`password_required` 일 때만). 암호 입력 화면 제목으로 쓴다.
+  final String? projectName;
+
+  const SettlementException(
+    this.message, {
+    this.code,
+    this.status,
+    this.projectName,
+  });
+
+  /// 암호를 넣어야 열리는 상태인가.
+  bool get needsPassword => code == 'password_required';
 
   @override
   String toString() => message;

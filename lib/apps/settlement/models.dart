@@ -137,6 +137,9 @@ class SettlementProject {
   /// 이 값이 있으면 `#/settlement/<code>` 링크로 다른 사람과 공유된다.
   final String? code;
 
+  /// 암호로 잠긴 **비밀 프로젝트**인지. 링크를 알아도 암호를 넣어야 열린다.
+  final bool locked;
+
   final String name;
   final DateTime createdAt;
   final List<Member> members;
@@ -156,6 +159,7 @@ class SettlementProject {
     required this.transfers,
     required this.settledLegs,
     this.code,
+    this.locked = false,
   });
 
   factory SettlementProject.create({
@@ -184,6 +188,7 @@ class SettlementProject {
       SettlementProject(
         id: id,
         code: code,
+        locked: locked,
         name: name ?? this.name,
         createdAt: createdAt,
         members: members ?? this.members,
@@ -206,6 +211,7 @@ class SettlementProject {
   Map<String, dynamic> toJson() => {
         'id': id,
         if (code != null) 'code': code,
+        if (locked) 'locked': true,
         'name': name,
         'createdAt': createdAt.toIso8601String(),
         'members': members.map((m) => m.toJson()).toList(),
@@ -218,6 +224,7 @@ class SettlementProject {
       SettlementProject(
         id: j['id'] as String,
         code: j['code'] as String?,
+        locked: j['locked'] == true,
         name: j['name'] as String,
         createdAt: parseTime(j['createdAt'] as String),
         members: (j['members'] as List)

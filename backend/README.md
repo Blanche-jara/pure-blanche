@@ -17,7 +17,8 @@ API 계약의 정답은 [`docs/GUESTBOOK_BACKEND.md`](../docs/GUESTBOOK_BACKEND.
 | `src/index.js` | Worker fetch 핸들러 — 방명록·통계 + 라우터 (ES module) |
 | `src/common.js` | CORS/JSON 응답/IP 해시/관리자 인증 (index·settlement 공용) |
 | `src/settlement.js` | SMTM 라우트 `/api/settlement/**` |
-| `smoke_settlement.sh` | SMTM API 인수 기준 35개 검증 스크립트 |
+| `smoke_settlement.sh` | SMTM API 인수 기준 48개 검증 스크립트 |
+| `migrate_settlement_password.sql` | 비밀 프로젝트 컬럼 추가 (기존 DB 1회) |
 
 ## 엔드포인트 요약
 
@@ -145,8 +146,20 @@ curl https://api.pure-blanche.com/api/settlement/zzzzzzzz
 전체 계약을 한 번에 검증하려면(만든 정산표는 끝에 삭제된다):
 
 ```bash
-API=https://api.pure-blanche.com bash smoke_settlement.sh   # 35개 항목
+API=https://api.pure-blanche.com bash smoke_settlement.sh   # 48개 항목
 ```
+
+### SMTM 비밀 프로젝트 마이그레이션 (기존 DB 1회)
+
+암호 잠금(`pass_salt`/`pass_hash`)은 **기존 `settle_projects` 테이블에 자동으로 안 붙는다**
+(`CREATE TABLE IF NOT EXISTS` 는 컬럼을 추가하지 않는다):
+
+```bash
+npx wrangler d1 execute pure-blanche-guestbook --remote --file=./migrate_settlement_password.sql
+```
+
+두 번째 실행은 "duplicate column name" 에러가 난다(정상, 무시).
+안 돌리면 비밀 프로젝트 생성이 500으로 실패한다.
 
 프론트엔드는 `--dart-define=GUESTBOOK_API=...`로 베이스 URL을 주입한다(기본값은 프로덕션).
 로컬 통합 테스트: `flutter run -d chrome --dart-define=GUESTBOOK_API=http://localhost:8787`.

@@ -39,6 +39,60 @@ const LEGS_PER_REQUEST_MAX = 200;
 const CREATE_TOO_FAST_SECONDS = 10;
 const CREATE_DAILY_LIMIT = 30;
 
+const PASSWORD_MIN = 4;
+const PASSWORD_MAX = 32;
+const PBKDF2_ITERATIONS = 100000;
+
+// ── 비밀 프로젝트(암호 잠금) ──────────────────────────────────────────
+// 암호는 원문을 저장하지 않는다. 프로젝트마다 다른 솔트로 PBKDF2-SHA256 10만 회.
+async function hashPassword(password, saltHex) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(password),
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: new TextEncoder().encode(saltHex),
+      iterations: PBKDF2_ITERATIONS,
+      hash: "SHA-256",
+    },
+    key,
+    256
+  );
+  return [...new Uint8Array(bits)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/**
+ * 암호를 통과한 뒤 브라우저가 들고 다니는 열쇠.
+ * 서버 시크릿(IP_SALT)이 있어야 만들 수 있고, 암호가 바뀌면 pass_hash 가 바뀌어
+ * 예전 열쇠는 저절로 무효가 된다. 별도 토큰 테이블이 필요 없다.
+ */
+async function accessTokenFor(env, project) {
+  const secret = env.IP_SALT || "dev-salt";
+  return await sha256Hex(`${secret}:access:${project.id}:${project.pass_hash}`);
+}
+
+/** 이 프로젝트를 열 권한이 있는가 (접근 토큰 / 소유자 토큰 / 관리자). */
+async function isAuthorized(env, request, project) {
+  if (!project.pass_hash) return true; // 공개 프로젝트
+  if (isAdmin(env, request)) return true;
+
+  const token = bearerToken(request);
+  if (!token) return false;
+
+  if (safeEqual(token, await accessTokenFor(env, project))) return true;
+  if (project.owner_hash && safeEqual(await sha256Hex(token), project.owner_hash)) {
+    return true;
+  }
+  return false;
+}
+
 // ── 값 검증 ───────────────────────────────────────────────────────────
 function trimmed(v) {
   return typeof v === "string" ? v.trim() : "";
@@ -62,7 +116,7 @@ function legKey(expenseId, debtorId) {
 /** 공유 코드로 프로젝트 전체를 조립한다. 없으면 null. */
 async function loadProject(env, code) {
   const row = await env.DB.prepare(
-    "SELECT id, code, name, created_at, updated_at FROM settle_projects WHERE code = ?"
+    "SELECT id, code, name, pass_hash, created_at, updated_at FROM settle_projects WHERE code = ?"
   )
     .bind(code)
     .first();
@@ -98,6 +152,7 @@ async function buildProject(env, row) {
     id: row.id,
     code: row.code,
     name: row.name,
+    locked: !!row.pass_hash,
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
     members: (members.results ?? []).map((m) => ({ id: m.id, name: m.name })),
@@ -140,7 +195,7 @@ async function touchAndRespond(env, request, projectRow) {
     .bind(projectRow.id)
     .run();
   const fresh = await env.DB.prepare(
-    "SELECT id, code, name, created_at, updated_at FROM settle_projects WHERE id = ?"
+    "SELECT id, code, name, pass_hash, created_at, updated_at FROM settle_projects WHERE id = ?"
   )
     .bind(projectRow.id)
     .first();
@@ -204,6 +259,14 @@ async function handleCreate(env, request) {
     return errorResponse(400, "too_long", "입력이 너무 깁니다.", request);
   }
 
+  // 비밀 프로젝트: 암호를 주면 잠긴다. 안 주면 지금까지처럼 링크만으로 열린다.
+  // (해시 계산은 무겁지만 rate limit 통과 후에 하므로 남용 비용은 낮다)
+  const password =
+    typeof body.password === "string" ? body.password : "";
+  if (password && (password.length < PASSWORD_MIN || password.length > PASSWORD_MAX)) {
+    return errorResponse(400, "bad_password", "암호는 4~32자로 입력해주세요.", request);
+  }
+
   // Rate limit (IP 해시 기준)
   const hash = await ipHash(env, request);
   const recent = await env.DB.prepare(
@@ -223,6 +286,13 @@ async function handleCreate(env, request) {
     return errorResponse(429, "daily_limit", "하루 생성 한도를 초과했습니다.", request);
   }
 
+  let passSalt = null;
+  let passHash = null;
+  if (password) {
+    passSalt = randomHex(16);
+    passHash = await hashPassword(password, passSalt);
+  }
+
   const id = crypto.randomUUID();
   const ownerToken = randomHex(16); // 32자 hex
   const ownerHash = await sha256Hex(ownerToken);
@@ -233,9 +303,9 @@ async function handleCreate(env, request) {
     const candidate = randomCode();
     try {
       await env.DB.prepare(
-        "INSERT INTO settle_projects (id, code, name, owner_hash, ip_hash) VALUES (?, ?, ?, ?, ?)"
+        "INSERT INTO settle_projects (id, code, name, owner_hash, pass_salt, pass_hash, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?)"
       )
-        .bind(id, candidate, name, ownerHash, hash)
+        .bind(id, candidate, name, ownerHash, passSalt, passHash, hash)
         .run();
       code = candidate;
       break;
@@ -256,7 +326,50 @@ async function handleCreate(env, request) {
   );
 
   const project = await loadProject(env, code);
-  return json({ project, ownerToken }, 201, request);
+  const row = await env.DB.prepare(
+    "SELECT id, pass_hash FROM settle_projects WHERE id = ?"
+  )
+    .bind(id)
+    .first();
+  const accessToken = passHash ? await accessTokenFor(env, row) : null;
+
+  return json({ project, ownerToken, accessToken }, 201, request);
+}
+
+// ── 잠금 해제 ─────────────────────────────────────────────────────────
+/** POST /unlock — 암호를 확인하고 접근 토큰을 발급한다. */
+async function handleUnlock(env, request, project) {
+  const body = await readJson(request);
+  if (!body) {
+    return errorResponse(400, "invalid_json", "잘못된 요청입니다.", request);
+  }
+  if (!project.pass_hash) {
+    // 암호가 없는 프로젝트 — 그냥 열어준다.
+    return json(
+      { project: await buildProject(env, project), accessToken: null },
+      200,
+      request
+    );
+  }
+
+  const password = typeof body.password === "string" ? body.password : "";
+  if (!password) {
+    return errorResponse(400, "empty", "암호를 입력해주세요.", request);
+  }
+
+  const attempt = await hashPassword(password, project.pass_salt || "");
+  if (!safeEqual(attempt, project.pass_hash)) {
+    return errorResponse(401, "bad_password", "암호가 올바르지 않습니다.", request);
+  }
+
+  return json(
+    {
+      project: await buildProject(env, project),
+      accessToken: await accessTokenFor(env, project),
+    },
+    200,
+    request
+  );
 }
 
 // ── 프로젝트 단위 ─────────────────────────────────────────────────────
@@ -650,12 +763,30 @@ export async function routeSettlement(env, request, path) {
   }
 
   const project = await env.DB.prepare(
-    "SELECT id, code, name, owner_hash, created_at, updated_at FROM settle_projects WHERE code = ?"
+    "SELECT id, code, name, owner_hash, pass_salt, pass_hash, created_at, updated_at FROM settle_projects WHERE code = ?"
   )
     .bind(code)
     .first();
   if (!project) {
     return errorResponse(404, "not_found", "정산표를 찾을 수 없습니다.", request);
+  }
+
+  // 잠금 해제 요청은 가드보다 먼저 처리한다(암호를 확인하는 문 자체이므로).
+  if (section === "unlock" && !itemId && method === "POST") {
+    return await handleUnlock(env, request, project);
+  }
+
+  // 비밀 프로젝트: 조회든 편집이든 열쇠가 있어야 한다.
+  if (!(await isAuthorized(env, request, project))) {
+    return json(
+      {
+        error: "password_required",
+        detail: "암호가 필요한 정산표입니다.",
+        name: project.name, // 암호 입력 화면에 이름은 보여준다
+      },
+      401,
+      request
+    );
   }
 
   // /api/settlement/:code

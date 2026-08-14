@@ -39,6 +39,10 @@ class _SettlementAppState extends State<SettlementApp> {
   bool _opening = false;
   String? _openError;
 
+  /// 암호를 물어야 하는 상태(비밀 프로젝트). 열려는 코드와 이름을 들고 있는다.
+  String? _lockedCode;
+  String? _lockedName;
+
   @override
   void initState() {
     super.initState();
@@ -76,24 +80,35 @@ class _SettlementAppState extends State<SettlementApp> {
   }
 
   /// 공유 코드로 서버에서 불러와 연다.
+  /// 비밀 프로젝트이고 열쇠가 없으면 암호 입력 화면으로 넘어간다.
   Future<void> _openShared(String code) async {
     setState(() {
       _opening = true;
       _openError = null;
+      _lockedCode = null;
     });
+
+    final saved = _store.sharedRef(code);
+    final token = saved?.accessToken ?? saved?.ownerToken;
+
     try {
-      final project = await _service.fetch(code);
+      final project = await _service.fetch(code, token: token);
       _store.rememberShared(project);
       if (!mounted) return;
       _opening = false;
-      _setController(RemoteSettlementController(
-        service: _service,
-        code: code,
-        initial: project,
-        store: _store,
-      ));
+      _openWith(code, project, saved?.accessToken);
     } on SettlementException catch (e) {
       if (!mounted) return;
+      if (e.needsPassword) {
+        // 보관 중이던 열쇠가 더는 안 통하면(암호 변경 등) 버리고 다시 묻는다.
+        if (token != null) _store.clearAccessToken(code);
+        setState(() {
+          _opening = false;
+          _lockedCode = code;
+          _lockedName = e.projectName ?? saved?.name;
+        });
+        return;
+      }
       setState(() {
         _opening = false;
         _openError = e.message;
@@ -101,7 +116,31 @@ class _SettlementAppState extends State<SettlementApp> {
     }
   }
 
+  void _openWith(String code, SettlementProject project, String? accessToken) {
+    _setController(RemoteSettlementController(
+      service: _service,
+      code: code,
+      initial: project,
+      accessToken: accessToken,
+      store: _store,
+    ));
+  }
+
+  /// 암호 입력 화면에서 잠금을 푼 뒤.
+  void _onUnlocked(String code, UnlockResult result) {
+    _store.rememberShared(result.project, accessToken: result.accessToken);
+    setState(() {
+      _lockedCode = null;
+      _lockedName = null;
+    });
+    _openWith(code, result.project, result.accessToken);
+  }
+
   void _close() {
+    setState(() {
+      _lockedCode = null;
+      _lockedName = null;
+    });
     _setController(null);
   }
 
@@ -114,6 +153,16 @@ class _SettlementAppState extends State<SettlementApp> {
         builder: (context, _) {
           if (!_store.ready || _opening) {
             return const _Spinner();
+          }
+          final locked = _lockedCode;
+          if (locked != null) {
+            return _UnlockScreen(
+              service: _service,
+              code: locked,
+              name: _lockedName,
+              onUnlocked: (result) => _onUnlocked(locked, result),
+              onBack: _close,
+            );
           }
           if (_openError != null && _controller == null) {
             return _OpenError(
@@ -193,6 +242,155 @@ class _OpenError extends StatelessWidget {
                 ],
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ───────────────────────────── 잠금 해제 ─────────────────────────────
+
+/// 비밀 프로젝트의 암호 입력 화면. 링크로 바로 들어와도 여기서 막힌다.
+class _UnlockScreen extends StatefulWidget {
+  final SettlementService service;
+  final String code;
+  final String? name;
+  final ValueChanged<UnlockResult> onUnlocked;
+  final VoidCallback onBack;
+
+  const _UnlockScreen({
+    required this.service,
+    required this.code,
+    required this.onUnlocked,
+    required this.onBack,
+    this.name,
+  });
+
+  @override
+  State<_UnlockScreen> createState() => _UnlockScreenState();
+}
+
+class _UnlockScreenState extends State<_UnlockScreen> {
+  final _password = TextEditingController();
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _password.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_busy) return;
+    final password = _password.text;
+    if (password.isEmpty) {
+      setState(() => _error = '암호를 입력해주세요.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final result = await widget.service.unlock(widget.code, password);
+      if (!mounted) return;
+      widget.onUnlocked(result);
+    } on SettlementException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = e.message;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.symmetric(horizontal: pick(context, 16.0, 24.0)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 380),
+          child: PanelCard(
+            highlighted: true,
+            padding: EdgeInsets.all(pick(context, 18.0, 24.0)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.lock_outline,
+                        size: 17, color: AppColors.signalGreen),
+                    SizedBox(width: 8),
+                    Text(
+                      '비밀 정산표',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                        color: AppColors.signalGreen,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  widget.name ?? '정산표',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'Segoe UI',
+                    fontSize: pick(context, 19.0, 22.0),
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.5,
+                    color: AppColors.snow,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '참여자에게 받은 암호를 넣으면 열린다.',
+                  style: TextStyle(
+                    fontSize: pick(context, 12.0, 13.0),
+                    color: AppColors.parchment,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                LabeledField(
+                  label: '암호',
+                  controller: _password,
+                  hint: '••••',
+                  maxLength: 32,
+                  autofocus: true,
+                  onSubmitted: (_) => _submit(),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _error!,
+                    style: const TextStyle(
+                        fontSize: 12.5, color: AppColors.danger),
+                  ),
+                ],
+                const SizedBox(height: 18),
+                PrimaryButton(
+                  label: _busy ? '확인 중…' : '열기',
+                  icon: Icons.lock_open,
+                  onTap: _busy ? null : _submit,
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.center,
+                  child: GhostButton(
+                    label: '목록으로',
+                    dense: true,
+                    onTap: widget.onBack,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -804,8 +1002,10 @@ class _CreateProjectForm extends StatefulWidget {
 class _CreateProjectFormState extends State<_CreateProjectForm> {
   final _name = TextEditingController();
   final _count = TextEditingController(text: '4');
+  final _password = TextEditingController();
   List<TextEditingController> _names = [];
   bool _share = true;
+  bool _secret = false;
   bool _submitting = false;
   String? _error;
 
@@ -819,6 +1019,7 @@ class _CreateProjectFormState extends State<_CreateProjectForm> {
   void dispose() {
     _name.dispose();
     _count.dispose();
+    _password.dispose();
     for (final c in _names) {
       c.dispose();
     }
@@ -878,6 +1079,12 @@ class _CreateProjectFormState extends State<_CreateProjectForm> {
       return;
     }
 
+    final password = _secret ? _password.text : '';
+    if (_secret && (password.length < 4 || password.length > 32)) {
+      setState(() => _error = '암호는 4~32자로 입력해주세요.');
+      return;
+    }
+
     setState(() {
       _submitting = true;
       _error = null;
@@ -886,9 +1093,13 @@ class _CreateProjectFormState extends State<_CreateProjectForm> {
       final created = await widget.service.create(
         name: projectName,
         memberNames: names,
+        password: _secret ? password : null,
       );
-      widget.store
-          .rememberShared(created.project, ownerToken: created.ownerToken);
+      widget.store.rememberShared(
+        created.project,
+        ownerToken: created.ownerToken,
+        accessToken: created.accessToken,
+      );
       if (!mounted) return;
       Navigator.of(context).pop(_CreateResult(code: created.project.code));
     } on SettlementException catch (e) {
@@ -979,6 +1190,34 @@ class _CreateProjectFormState extends State<_CreateProjectForm> {
           onChanged: (v) => setState(() => _share = v),
         ),
 
+        // ── 비밀 프로젝트 ── 공유일 때만 의미가 있다.
+        if (_share) ...[
+          const SizedBox(height: 12),
+          _SecretToggle(
+            secret: _secret,
+            onChanged: (v) => setState(() => _secret = v),
+          ),
+          if (_secret) ...[
+            const SizedBox(height: 10),
+            LabeledField(
+              label: '암호 (4~32자)',
+              controller: _password,
+              hint: '참여자에게 따로 알려줄 암호',
+              maxLength: 32,
+              onSubmitted: (_) => _submit(),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '링크를 알아도 이 암호를 넣어야 열린다. 잊으면 되돌릴 수 없으니 참여자와 공유해둘 것.',
+              style: TextStyle(
+                fontSize: pick(context, 10.5, 11.5),
+                height: 1.5,
+                color: AppColors.steel,
+              ),
+            ),
+          ],
+        ],
+
         if (_error != null) ...[
           const SizedBox(height: 14),
           Text(
@@ -1052,6 +1291,94 @@ class _ShareToggle extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// 비밀 프로젝트 켜기/끄기.
+class _SecretToggle extends StatelessWidget {
+  final bool secret;
+  final ValueChanged<bool> onChanged;
+
+  const _SecretToggle({required this.secret, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => onChanged(!secret),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: secret
+                ? AppColors.signalGreen.withValues(alpha: 0.08)
+                : AppColors.abyss,
+            border: Border.all(
+              color: secret ? AppColors.signalGreen : AppColors.warmCharcoal,
+            ),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                secret ? Icons.lock : Icons.lock_open,
+                size: 15,
+                color: secret ? AppColors.signalGreen : AppColors.steel,
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '비밀 프로젝트',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: secret
+                            ? AppColors.signalGreen
+                            : AppColors.parchment,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      '암호를 아는 사람만 들어올 수 있다',
+                      style: TextStyle(fontSize: 11.5, color: AppColors.steel),
+                    ),
+                  ],
+                ),
+              ),
+              // 스위치 모양 표시(탭 영역은 행 전체).
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 34,
+                height: 19,
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: secret
+                      ? AppColors.signalGreen
+                      : AppColors.warmCharcoal.withValues(alpha: 0.7),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Align(
+                  alignment:
+                      secret ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Container(
+                    width: 15,
+                    height: 15,
+                    decoration: const BoxDecoration(
+                      color: AppColors.abyss,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

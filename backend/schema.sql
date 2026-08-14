@@ -51,6 +51,8 @@ CREATE TABLE IF NOT EXISTS settle_projects (
   code       TEXT NOT NULL UNIQUE,   -- 공유 코드 8자
   name       TEXT NOT NULL,
   owner_hash TEXT,                   -- SHA-256(ownerToken). 프로젝트 삭제 권한 확인용
+  pass_salt  TEXT,                   -- 비밀 프로젝트: 암호 솔트(hex). NULL이면 공개
+  pass_hash  TEXT,                   -- 비밀 프로젝트: PBKDF2-SHA256(암호, 솔트)
   ip_hash    TEXT,                   -- 생성자 IP 해시 (rate limit)
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))

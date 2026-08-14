@@ -26,6 +26,9 @@ class SharedRef {
   /// 이 브라우저에서 만든 정산표라면 삭제 권한 토큰. 남의 링크로 열었으면 null.
   final String? ownerToken;
 
+  /// 비밀 프로젝트의 잠금을 푼 뒤 받은 열쇠. 있으면 다시 암호를 묻지 않는다.
+  final String? accessToken;
+
   final DateTime lastOpenedAt;
 
   const SharedRef({
@@ -33,6 +36,7 @@ class SharedRef {
     required this.name,
     required this.lastOpenedAt,
     this.ownerToken,
+    this.accessToken,
   });
 
   bool get isOwner => ownerToken != null;
@@ -41,6 +45,7 @@ class SharedRef {
         'code': code,
         'name': name,
         if (ownerToken != null) 'ownerToken': ownerToken,
+        if (accessToken != null) 'accessToken': accessToken,
         'lastOpenedAt': lastOpenedAt.toIso8601String(),
       };
 
@@ -48,6 +53,7 @@ class SharedRef {
         code: j['code'] as String,
         name: (j['name'] as String?) ?? '정산표',
         ownerToken: j['ownerToken'] as String?,
+        accessToken: j['accessToken'] as String?,
         lastOpenedAt: parseTime(
             (j['lastOpenedAt'] as String?) ?? DateTime.now().toIso8601String()),
       );
@@ -143,8 +149,13 @@ class SettlementStore extends ChangeNotifier {
   // ─────────────────────── 공유 정산표 메모 ───────────────────────
 
   /// 공유 정산표를 열거나 갱신할 때마다 호출 — 이름/최근 열람을 최신으로 유지한다.
-  /// [ownerToken] 은 처음 만들 때 한 번만 주고, 이후 호출에서는 기존 값을 지키지 않는다.
-  void rememberShared(SettlementProject project, {String? ownerToken}) {
+  /// [ownerToken]·[accessToken] 은 새로 받았을 때만 주면 되고,
+  /// 안 주면 이미 보관 중인 값을 그대로 지킨다.
+  void rememberShared(
+    SettlementProject project, {
+    String? ownerToken,
+    String? accessToken,
+  }) {
     final code = project.code;
     if (code == null) return;
 
@@ -153,9 +164,30 @@ class SettlementStore extends ChangeNotifier {
       code: code,
       name: project.name,
       ownerToken: ownerToken ?? existing?.ownerToken,
+      accessToken: accessToken ?? existing?.accessToken,
       lastOpenedAt: DateTime.now(),
     );
     _shared = [ref, ..._shared.where((s) => s.code != code)];
+    notifyListeners();
+    _persist();
+  }
+
+  /// 접근 토큰만 버린다(암호가 바뀌어 열쇠가 무효가 된 경우).
+  void clearAccessToken(String code) {
+    final existing = sharedRef(code);
+    if (existing == null || existing.accessToken == null) return;
+    _shared = [
+      for (final s in _shared)
+        if (s.code == code)
+          SharedRef(
+            code: s.code,
+            name: s.name,
+            ownerToken: s.ownerToken,
+            lastOpenedAt: s.lastOpenedAt,
+          )
+        else
+          s
+    ];
     notifyListeners();
     _persist();
   }

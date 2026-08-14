@@ -159,6 +159,9 @@ class RemoteSettlementController extends SettlementController {
   final SettlementService service;
   final String code;
 
+  /// 비밀 프로젝트의 열쇠. 공개 프로젝트면 null.
+  final String? accessToken;
+
   /// 공유 목록의 이름/최근 열람을 갱신하기 위한 로컬 스토어(선택).
   final SettlementStore? store;
 
@@ -170,6 +173,7 @@ class RemoteSettlementController extends SettlementController {
     required this.service,
     required this.code,
     required SettlementProject initial,
+    this.accessToken,
     this.store,
   }) : _project = initial;
 
@@ -209,10 +213,12 @@ class RemoteSettlementController extends SettlementController {
   }
 
   @override
-  Future<void> refresh() => _run(() => service.fetch(code));
+  Future<void> refresh() =>
+      _run(() => service.fetch(code, token: accessToken));
 
   @override
-  Future<void> rename(String name) => _run(() => service.rename(code, name));
+  Future<void> rename(String name) =>
+      _run(() => service.rename(code, name, token: accessToken));
 
   @override
   Future<void> addExpense({
@@ -227,6 +233,7 @@ class RemoteSettlementController extends SettlementController {
             amount: amount,
             payerId: payerId,
             participantIds: participantIds,
+            token: accessToken,
           ));
 
   @override
@@ -244,11 +251,12 @@ class RemoteSettlementController extends SettlementController {
             amount: amount,
             payerId: payerId,
             participantIds: participantIds,
+            token: accessToken,
           ));
 
   @override
   Future<void> removeExpense(String expenseId) =>
-      _run(() => service.removeExpense(code, expenseId));
+      _run(() => service.removeExpense(code, expenseId, token: accessToken));
 
   @override
   Future<void> addTransfer({
@@ -263,11 +271,12 @@ class RemoteSettlementController extends SettlementController {
             toId: toId,
             amount: amount,
             memo: memo,
+            token: accessToken,
           ));
 
   @override
   Future<void> removeTransfer(String transferId) =>
-      _run(() => service.removeTransfer(code, transferId));
+      _run(() => service.removeTransfer(code, transferId, token: accessToken));
 
   @override
   Future<void> setLegSettled(
@@ -276,6 +285,7 @@ class RemoteSettlementController extends SettlementController {
             code,
             legs: [(expenseId: expenseId, debtorId: debtorId)],
             settled: settled,
+            token: accessToken,
           ));
 
   @override
@@ -284,16 +294,17 @@ class RemoteSettlementController extends SettlementController {
       for (final l in legs) (expenseId: l.expenseId, debtorId: l.debtorId)
     ];
     if (list.isEmpty) return Future.value();
-    return _run(() => service.setLegs(code, legs: list, settled: true));
+    return _run(() =>
+        service.setLegs(code, legs: list, settled: true, token: accessToken));
   }
 
   /// 인원 추가/이름변경/삭제 — 공유 프로젝트에서만 쓰는 부가 기능.
   Future<void> addMember(String name) =>
-      _run(() => service.addMember(code, name));
+      _run(() => service.addMember(code, name, token: accessToken));
 
-  Future<void> renameMember(String memberId, String name) =>
-      _run(() => service.renameMember(code, memberId, name));
+  Future<void> renameMember(String memberId, String name) => _run(
+      () => service.renameMember(code, memberId, name, token: accessToken));
 
   Future<void> removeMember(String memberId) =>
-      _run(() => service.removeMember(code, memberId));
+      _run(() => service.removeMember(code, memberId, token: accessToken));
 }

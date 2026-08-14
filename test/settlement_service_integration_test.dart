@@ -137,4 +137,74 @@ void main() {
       throwsA(isA<SettlementException>()),
     );
   }, timeout: const Timeout(Duration(seconds: 60)));
+
+  test('비밀 프로젝트는 암호를 넣어야 열리고, 열쇠는 편집에도 쓰인다', () async {
+    if (!up) return;
+
+    final service = SettlementService();
+
+    // 생성 rate limit(10초)을 피하려고 앞 테스트와 간격을 둔다.
+    await Future<void>.delayed(const Duration(seconds: 11));
+
+    final created = await service.create(
+      name: '비밀 여행 정산',
+      memberNames: ['블랑쉬', '민수'],
+      password: 'tr1p2026',
+    );
+    final code = created.project.code!;
+    expect(created.project.locked, isTrue);
+    expect(created.accessToken, isNotNull);
+
+    // 열쇠 없이는 조회조차 막힌다 — 그리고 그 사실을 코드로 구분할 수 있어야 한다.
+    try {
+      await service.fetch(code);
+      fail('암호 없이 열려서는 안 된다');
+    } on SettlementException catch (e) {
+      expect(e.needsPassword, isTrue);
+      expect(e.projectName, '비밀 여행 정산'); // 암호 화면에 띄울 이름
+    }
+
+    // 틀린 암호.
+    await expectLater(
+      service.unlock(code, 'wrong-password'),
+      throwsA(
+        isA<SettlementException>().having((e) => e.code, 'code', 'bad_password'),
+      ),
+    );
+
+    // 맞는 암호 → 생성 때 받은 것과 같은 열쇠.
+    final unlocked = await service.unlock(code, 'tr1p2026');
+    expect(unlocked.accessToken, created.accessToken);
+    expect(unlocked.project.name, '비밀 여행 정산');
+
+    // 열쇠로 조회·편집 모두 된다.
+    final token = unlocked.accessToken;
+    final fetched = await service.fetch(code, token: token);
+    expect(fetched.members.length, 2);
+
+    final withExpense = await service.addExpense(
+      code,
+      title: '숙소',
+      amount: 100000,
+      payerId: fetched.members[0].id,
+      participantIds: fetched.members.map((m) => m.id).toList(),
+      token: token,
+    );
+    expect(withExpense.expenses.single.amount, 100000);
+
+    // 열쇠 없는 편집은 막힌다.
+    await expectLater(
+      service.addExpense(
+        code,
+        title: '몰래',
+        amount: 5000,
+        payerId: fetched.members[0].id,
+        participantIds: [fetched.members[0].id],
+      ),
+      throwsA(isA<SettlementException>()
+          .having((e) => e.needsPassword, 'needsPassword', isTrue)),
+    );
+
+    await service.deleteProject(code, ownerToken: created.ownerToken);
+  }, timeout: const Timeout(Duration(seconds: 90)));
 }

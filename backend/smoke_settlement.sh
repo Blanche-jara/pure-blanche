@@ -101,7 +101,36 @@ echo "11) 방명록 회귀"
 check "GET /api/guestbook 200" "$(curl -s -o /dev/null -w '%{http_code}' $API/api/guestbook)" "200"
 check "알 수 없는 경로 404" "$(curl -s -o /dev/null -w '%{http_code}' $API/api/nope)" "404"
 
-echo "12) 소유자 토큰으로 삭제"
+echo "12) 비밀 프로젝트(암호 잠금)"
+check "공개 프로젝트는 locked=false" "$(curl -s $API/api/settlement/$CODE | jq -r .project.locked)" "false"
+sleep 11   # 생성 rate limit 회피
+P=$(curl -s -X POST $API/api/settlement -H 'Content-Type: application/json' \
+  -d '{"name":"비밀 여행","members":["A","B","C"],"password":"tr1p2026"}')
+PCODE=$(echo "$P" | jq -r .project.code); PTOK=$(echo "$P" | jq -r .accessToken)
+POWN=$(echo "$P" | jq -r .ownerToken)
+check "생성 시 locked=true" "$(echo "$P" | jq -r .project.locked)" "true"
+check "생성 시 접근 토큰 발급" "$(echo -n "$PTOK" | wc -c | tr -d ' ')" "64"
+check "토큰 없이 조회 → 401" "$(curl -s -o /dev/null -w '%{http_code}' $API/api/settlement/$PCODE)" "401"
+check "에러 코드 password_required" "$(curl -s $API/api/settlement/$PCODE | jq -r .error)" "password_required"
+check "이름은 알려준다(입력 화면용)" "$(curl -s $API/api/settlement/$PCODE | jq -r .name)" "비밀 여행"
+check "토큰으로 조회 성공" "$(curl -s $API/api/settlement/$PCODE -H "Authorization: Bearer $PTOK" | jq -r .project.name)" "비밀 여행"
+check "틀린 암호 → 401" "$(curl -s -X POST $API/api/settlement/$PCODE/unlock \
+  -H 'Content-Type: application/json' -d '{"password":"wrong"}' | jq -r .error)" "bad_password"
+check "맞는 암호 → 같은 토큰" "$(curl -s -X POST $API/api/settlement/$PCODE/unlock \
+  -H 'Content-Type: application/json' -d '{"password":"tr1p2026"}' | jq -r .accessToken)" "$PTOK"
+PM1=$(curl -s $API/api/settlement/$PCODE -H "Authorization: Bearer $PTOK" | jq -r '.project.members[0].id')
+check "토큰 없이 편집 → 401" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $API/api/settlement/$PCODE/expenses \
+  -H 'Content-Type: application/json' -d "{\"title\":\"x\",\"amount\":1000,\"payerId\":\"$PM1\",\"participantIds\":[\"$PM1\"]}")" "401"
+check "토큰으로 편집 성공" "$(curl -s -X POST $API/api/settlement/$PCODE/expenses \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $PTOK" \
+  -d "{\"title\":\"x\",\"amount\":1000,\"payerId\":\"$PM1\",\"participantIds\":[\"$PM1\"]}" | jq '.project.expenses|length')" "1"
+check "소유자 토큰으로도 열림" "$(curl -s $API/api/settlement/$PCODE -H "Authorization: Bearer $POWN" | jq -r .project.name)" "비밀 여행"
+curl -s -o /dev/null -X DELETE $API/api/settlement/$PCODE -H "Authorization: Bearer $POWN"
+sleep 11
+check "짧은 암호 거부" "$(curl -s -X POST $API/api/settlement \
+  -H 'Content-Type: application/json' -d '{"name":"x","members":["a","b"],"password":"1"}' | jq -r .error)" "bad_password"
+
+echo "13) 소유자 토큰으로 삭제"
 check "삭제 성공" "$(curl -s -X DELETE $API/api/settlement/$CODE -H "Authorization: Bearer $OWNER" | jq -r .ok)" "true"
 check "삭제 후 404" "$(curl -s -o /dev/null -w '%{http_code}' $API/api/settlement/$CODE)" "404"
 
