@@ -161,6 +161,16 @@ npx wrangler d1 execute pure-blanche-guestbook --remote --file=./migrate_settlem
 두 번째 실행은 "duplicate column name" 에러가 난다(정상, 무시).
 안 돌리면 비밀 프로젝트 생성이 500으로 실패한다.
 
+> `--file` 이 `Authentication error [code: 10000]` 로 실패할 때가 있다(import API 권한).
+> 이때는 같은 내용을 `--command` 로 한 줄씩 넣으면 통과한다:
+> ```bash
+> npx wrangler d1 execute pure-blanche-guestbook --remote \
+>   --command "ALTER TABLE settle_projects ADD COLUMN pass_salt TEXT"
+> npx wrangler d1 execute pure-blanche-guestbook --remote \
+>   --command "ALTER TABLE settle_projects ADD COLUMN pass_hash TEXT"
+> ```
+> 적용 확인: `--command "SELECT name FROM pragma_table_info('settle_projects')"`
+
 프론트엔드는 `--dart-define=GUESTBOOK_API=...`로 베이스 URL을 주입한다(기본값은 프로덕션).
 로컬 통합 테스트: `flutter run -d chrome --dart-define=GUESTBOOK_API=http://localhost:8787`.
 
