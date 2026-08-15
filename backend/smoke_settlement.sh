@@ -101,6 +101,27 @@ echo "11) 방명록 회귀"
 check "GET /api/guestbook 200" "$(curl -s -o /dev/null -w '%{http_code}' $API/api/guestbook)" "200"
 check "알 수 없는 경로 404" "$(curl -s -o /dev/null -w '%{http_code}' $API/api/nope)" "404"
 
+echo "11b) 송금이 건을 자동 정산 처리한다 (이중 차감 방지)"
+# 새 프로젝트로 깨끗하게: A가 30,000 결제, B가 15,000 갚을 빚.
+sleep 11
+X=$(curl -s -X POST $API/api/settlement -H 'Content-Type: application/json' \
+  -d '{"name":"장부 합치기","members":["갑","을"]}')
+XCODE=$(echo "$X" | jq -r .project.code); XOWN=$(echo "$X" | jq -r .ownerToken)
+XA=$(echo "$X" | jq -r '.project.members[0].id'); XB=$(echo "$X" | jq -r '.project.members[1].id')
+XE=$(curl -s -X POST $API/api/settlement/$XCODE/expenses -H 'Content-Type: application/json' \
+  -d "{\"title\":\"밥\",\"amount\":30000,\"payerId\":\"$XA\",\"participantIds\":[\"$XA\",\"$XB\"]}")
+XEID=$(echo "$XE" | jq -r '.project.expenses[0].id')
+# 합계 송금 15,000 + 그 건을 함께 정산 처리
+XT=$(curl -s -X POST $API/api/settlement/$XCODE/transfers -H 'Content-Type: application/json' \
+  -d "{\"fromId\":\"$XB\",\"toId\":\"$XA\",\"amount\":15000,\"applied\":15000,\"legs\":[{\"expenseId\":\"$XEID\",\"debtorId\":\"$XB\"}]}")
+check "송금과 함께 건이 정산됨" "$(echo "$XT" | jq '.project.settledLegs|length')" "1"
+check "applied 가 보존됨" "$(echo "$XT" | jq -r '.project.transfers[0].applied')" "15000"
+check "applied 는 amount 초과 불가" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $API/api/settlement/$XCODE/transfers \
+  -H 'Content-Type: application/json' -d "{\"fromId\":\"$XB\",\"toId\":\"$XA\",\"amount\":1000,\"applied\":5000}")" "400"
+check "남의 빚은 못 정산 처리" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $API/api/settlement/$XCODE/transfers \
+  -H 'Content-Type: application/json' -d "{\"fromId\":\"$XA\",\"toId\":\"$XB\",\"amount\":1000,\"applied\":0,\"legs\":[{\"expenseId\":\"$XEID\",\"debtorId\":\"$XB\"}]}")" "400"
+curl -s -o /dev/null -X DELETE $API/api/settlement/$XCODE -H "Authorization: Bearer $XOWN"
+
 echo "12) 비밀 프로젝트(암호 잠금)"
 check "공개 프로젝트는 locked=false" "$(curl -s $API/api/settlement/$CODE | jq -r .project.locked)" "false"
 sleep 11   # 생성 rate limit 회피

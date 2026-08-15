@@ -108,7 +108,7 @@ Base URL은 방명록과 동일(`https://api.pure-blanche.com`, 로컬 `http://l
 | POST | `/api/settlement/:code/expenses` | — | `{title, amount, payerId, participantIds}` | 200 `{project}` |
 | PATCH | `/api/settlement/:code/expenses/:id` | — | 위와 동일(전체 교체) | 200 `{project}` |
 | DELETE | `/api/settlement/:code/expenses/:id` | — | — | 200 `{project}` |
-| POST | `/api/settlement/:code/transfers` | — | `{fromId, toId, amount, memo?}` | 200 `{project}` |
+| POST | `/api/settlement/:code/transfers` | — | `{fromId, toId, amount, memo?, applied?, legs?}` | 200 `{project}` |
 | DELETE | `/api/settlement/:code/transfers/:id` | — | — | 200 `{project}` |
 | PUT | `/api/settlement/:code/legs` | — | `{legs:[{expenseId, debtorId}], settled:bool}` | 200 `{project}` |
 
@@ -118,6 +118,11 @@ Base URL은 방명록과 동일(`https://api.pure-blanche.com`, 로컬 `http://l
 - `PATCH …/expenses/:id` 로 참여자에서 빠진 사람의 입금 처리 기록은 **함께 삭제**된다
   (근거가 사라진 정산 표시를 남기지 않는다). 프론트 `updateExpense` 와 같은 규칙.
 - `DELETE …/expenses/:id` 는 해당 지출의 입금 처리 기록도 함께 지운다.
+- **송금은 채무 건과 한 몸으로 기록한다.** `POST …/transfers` 의 `legs` 는 이 송금이
+  덮는 건들이고 `applied` 는 거기 붙은 금액이다. 서버는 둘을 한 배치로 처리해
+  송금 기록과 건 정산이 갈라지지 않게 한다. 어떤 건이 덮이는지는 분할 규칙을 아는
+  **클라이언트가 계산**하고(`engine.dart` 의 `coverageOf`), 서버는 정합성만 본다
+  (실재하는 건인지, 채무자가 보낸 사람이 맞는지, `applied ≤ amount` 인지).
 
 ### 3.3 에러 코드
 
@@ -169,7 +174,9 @@ CREATE TABLE IF NOT EXISTS settle_expenses (
 CREATE TABLE IF NOT EXISTS settle_transfers (
   id TEXT PRIMARY KEY, project_id TEXT NOT NULL,
   from_id TEXT NOT NULL, to_id TEXT NOT NULL,
-  amount INTEGER NOT NULL, memo TEXT NOT NULL DEFAULT '',
+  amount INTEGER NOT NULL,
+  applied INTEGER NOT NULL DEFAULT 0,   -- 특정 채무 건에 붙은 금액
+  memo TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS settle_legs (          -- "입금했습니다" 처리 기록
@@ -190,6 +197,7 @@ CREATE TABLE IF NOT EXISTS settle_legs (          -- "입금했습니다" 처리
 >   --file=./migrate_settlement_password.sql
 > ```
 > 두 번째 실행은 "duplicate column name" 에러가 난다(정상).
+> `settle_transfers.applied` 도 마찬가지라 `migrate_transfer_applied.sql` 을 한 번 더 돌린다.
 
 ### 4.2 검증 · 상한
 

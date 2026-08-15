@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS settle_transfers (
   from_id    TEXT NOT NULL,
   to_id      TEXT NOT NULL,
   amount     INTEGER NOT NULL,
+  applied    INTEGER NOT NULL DEFAULT 0,  -- 특정 채무 건에 붙은 금액(그만큼은 건이 정산 처리됨)
   memo       TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

@@ -342,69 +342,96 @@ class _TransferRow extends StatelessWidget {
         horizontal: compact ? 11 : 16,
         vertical: compact ? 8 : 12,
       ),
-      child: Row(
+      // 이름 두 개 + 메모 + 선입금 + 금액을 한 줄에 두면 좁은 화면에서 넘친다.
+      // 위: 누가 누구에게 얼마 / 아래: 날짜·메모·선입금.
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Row(
-              children: [
-                Flexible(
-                  child: Text(
-                    project.nameOf(transfer.fromId),
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.snow),
-                  ),
+          Row(
+            children: [
+              Flexible(
+                child: Text(
+                  project.nameOf(transfer.fromId),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: compact ? 13 : 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.snow),
                 ),
-                Padding(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: compact ? 6 : 10),
-                  child: const Icon(Icons.arrow_forward,
-                      size: 13, color: AppColors.signalGreen),
+              ),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: compact ? 6 : 10),
+                child: const Icon(Icons.arrow_forward,
+                    size: 13, color: AppColors.signalGreen),
+              ),
+              Flexible(
+                child: Text(
+                  project.nameOf(transfer.toId),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: compact ? 13 : 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.snow),
                 ),
-                Flexible(
-                  child: Text(
-                    project.nameOf(transfer.toId),
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.snow),
-                  ),
-                ),
-                if (transfer.memo.isNotEmpty) ...[
-                  const SizedBox(width: 10),
-                  Flexible(
-                    child: Text(
-                      transfer.memo,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.steel),
-                    ),
-                  ),
-                ],
-              ],
-            ),
+              ),
+              const Spacer(),
+              SizedBox(width: compact ? 6 : 12),
+              Money(transfer.amount,
+                  size: compact ? 13.5 : 15, color: AppColors.mint),
+              const SizedBox(width: 2),
+              _MiniIcon(
+                icon: Icons.delete_outline,
+                tooltip: '삭제',
+                color: AppColors.danger,
+                onTap: () => controller.removeTransfer(transfer.id),
+              ),
+            ],
           ),
-          if (!compact) ...[
-            const SizedBox(width: 12),
-            Text(
-              formatDay(transfer.createdAt),
-              style: const TextStyle(
-                  fontFamily: 'Consolas',
-                  fontSize: 11.5,
-                  color: AppColors.steel),
-            ),
-          ],
-          SizedBox(width: compact ? 8 : 12),
-          Money(transfer.amount, size: compact ? 13.5 : 15, color: AppColors.mint),
-          const SizedBox(width: 4),
-          _MiniIcon(
-            icon: Icons.delete_outline,
-            tooltip: '삭제',
-            color: AppColors.danger,
-            onTap: () => controller.removeTransfer(transfer.id),
+          SizedBox(height: compact ? 2 : 4),
+          Row(
+            children: [
+              Text(
+                formatDay(transfer.createdAt),
+                style: TextStyle(
+                    fontFamily: 'Consolas',
+                    fontSize: compact ? 10 : 11,
+                    color: AppColors.steel),
+              ),
+              if (transfer.memo.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    transfer.memo,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: compact ? 11 : 12, color: AppColors.steel),
+                  ),
+                ),
+              ],
+              const Spacer(),
+              if (transfer.credit > 0)
+                Text(
+                  '선입금 ${formatWon(transfer.credit)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'Consolas',
+                    fontSize: compact ? 10 : 11,
+                    color: AppColors.warning,
+                  ),
+                )
+              else
+                Text(
+                  '건에 반영됨',
+                  style: TextStyle(
+                    fontSize: compact ? 10 : 11,
+                    color: AppColors.signalGreen,
+                  ),
+                ),
+            ],
           ),
         ],
       ),

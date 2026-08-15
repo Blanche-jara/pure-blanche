@@ -138,7 +138,7 @@ async function buildProject(env, row) {
     .bind(row.id)
     .all();
   const transfers = await env.DB.prepare(
-    "SELECT id, from_id, to_id, amount, memo, created_at FROM settle_transfers WHERE project_id = ? ORDER BY created_at, rowid"
+    "SELECT id, from_id, to_id, amount, applied, memo, created_at FROM settle_transfers WHERE project_id = ? ORDER BY created_at, rowid"
   )
     .bind(row.id)
     .all();
@@ -169,6 +169,7 @@ async function buildProject(env, row) {
       fromId: t.from_id,
       toId: t.to_id,
       amount: t.amount,
+      applied: t.applied ?? 0,
       memo: t.memo ?? "",
       createdAt: iso(t.created_at),
     })),
@@ -665,11 +666,42 @@ async function handleAddTransfer(env, request, project) {
     return errorResponse(409, "limit_exceeded", "한도를 초과했습니다.", request);
   }
 
-  await env.DB.prepare(
-    "INSERT INTO settle_transfers (id, project_id, from_id, to_id, amount, memo) VALUES (?, ?, ?, ?, ?, ?)"
-  )
-    .bind(crypto.randomUUID(), project.id, fromId, toId, body.amount, memo)
-    .run();
+  // 이 송금이 덮는 채무 건들 — 클라이언트가 계산해서 함께 보낸다.
+  // (분할 규칙은 engine.dart 한 곳에만 둔다.) 여기서는 정합성만 검증한다.
+  const rawLegs = Array.isArray(body.legs) ? body.legs : [];
+  if (rawLegs.length > LEGS_PER_REQUEST_MAX) {
+    return errorResponse(400, "bad_request", "요청이 올바르지 않습니다.", request);
+  }
+  const parsed = await parseLegs(env, request, project, rawLegs);
+  if (parsed.error) return parsed.error;
+  // 정산 처리되는 건은 반드시 "보낸 사람이 받는 사람에게" 갚는 건이어야 한다.
+  if (parsed.legs.some((l) => l.debtorId !== fromId)) {
+    return errorResponse(400, "bad_member", "인원 정보가 올바르지 않습니다.", request);
+  }
+
+  const applied = Number.isInteger(body.applied) ? body.applied : 0;
+  if (applied < 0 || applied > body.amount) {
+    return errorResponse(400, "bad_amount", "금액이 올바르지 않습니다.", request);
+  }
+
+  await env.DB.batch([
+    env.DB.prepare(
+      "INSERT INTO settle_transfers (id, project_id, from_id, to_id, amount, applied, memo) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).bind(
+      crypto.randomUUID(),
+      project.id,
+      fromId,
+      toId,
+      body.amount,
+      applied,
+      memo
+    ),
+    ...parsed.legs.map((l) =>
+      env.DB.prepare(
+        "INSERT OR IGNORE INTO settle_legs (project_id, expense_id, debtor_id) VALUES (?, ?, ?)"
+      ).bind(project.id, l.expenseId, l.debtorId)
+    ),
+  ]);
   return await touchAndRespond(env, request, project);
 }
 
@@ -685,30 +717,23 @@ async function handleDeleteTransfer(env, request, project, transferId) {
   return await touchAndRespond(env, request, project);
 }
 
-// ── 입금 처리 ─────────────────────────────────────────────────────────
-/** PUT /legs — "입금했습니다"(settled:true) / 취소(false). */
-async function handleLegs(env, request, project) {
-  const body = await readJson(request);
-  if (!body) {
-    return errorResponse(400, "invalid_json", "잘못된 요청입니다.", request);
-  }
-  const settled = body.settled === true;
-  const raw = Array.isArray(body.legs) ? body.legs : null;
-  if (!raw || raw.length === 0 || raw.length > LEGS_PER_REQUEST_MAX) {
-    return errorResponse(400, "bad_request", "요청이 올바르지 않습니다.", request);
-  }
-
+/**
+ * 채무 건 목록을 검증한다. 실재하는 지출의, 실재하는 참여자에 대한 건만 통과.
+ * 성공하면 `{legs}`, 실패하면 `{error: Response}`.
+ */
+async function parseLegs(env, request, project, raw) {
   const legs = [];
   for (const l of raw) {
     const expenseId = typeof l?.expenseId === "string" ? l.expenseId : "";
     const debtorId = typeof l?.debtorId === "string" ? l.debtorId : "";
     if (!expenseId || !debtorId) {
-      return errorResponse(400, "bad_request", "요청이 올바르지 않습니다.", request);
+      return {
+        error: errorResponse(400, "bad_request", "요청이 올바르지 않습니다.", request),
+      };
     }
     legs.push({ expenseId, debtorId });
   }
 
-  // 실재하는 지출의, 실재하는 참여자에 대한 건만 받는다.
   const { results } = await env.DB.prepare(
     "SELECT id, payer_id, participants FROM settle_expenses WHERE project_id = ?"
   )
@@ -723,9 +748,30 @@ async function handleLegs(env, request, project) {
   for (const l of legs) {
     const e = byExpense.get(l.expenseId);
     if (!e || l.debtorId === e.payerId || !e.participants.includes(l.debtorId)) {
-      return errorResponse(400, "bad_member", "인원 정보가 올바르지 않습니다.", request);
+      return {
+        error: errorResponse(400, "bad_member", "인원 정보가 올바르지 않습니다.", request),
+      };
     }
   }
+  return { legs };
+}
+
+// ── 입금 처리 ─────────────────────────────────────────────────────────
+/** PUT /legs — "입금했습니다"(settled:true) / 취소(false). */
+async function handleLegs(env, request, project) {
+  const body = await readJson(request);
+  if (!body) {
+    return errorResponse(400, "invalid_json", "잘못된 요청입니다.", request);
+  }
+  const settled = body.settled === true;
+  const raw = Array.isArray(body.legs) ? body.legs : null;
+  if (!raw || raw.length === 0 || raw.length > LEGS_PER_REQUEST_MAX) {
+    return errorResponse(400, "bad_request", "요청이 올바르지 않습니다.", request);
+  }
+
+  const parsed = await parseLegs(env, request, project, raw);
+  if (parsed.error) return parsed.error;
+  const legs = parsed.legs;
 
   await env.DB.batch(
     legs.map((l) =>

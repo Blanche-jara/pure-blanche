@@ -85,11 +85,13 @@ List<PairFlow> pairFlows(SettlementProject project) {
     raw[k] = (raw[k] ?? 0) + leg.amount;
   }
 
-  // 직접 송금은 채무를 줄인다(보낸 사람 기준 차감).
+  // 송금 중 **건에 붙지 않고 남은 돈**만 추가로 차감한다.
+  // 건에 붙은 금액(applied)은 이미 그 건이 정산 처리되며 빠졌다 — 두 번 빼면 안 된다.
   final sent = <String, int>{}; // 'from>to' → 합계
   for (final t in project.transfers) {
+    if (t.credit <= 0) continue;
     final k = '${t.fromId}>${t.toId}';
-    sent[k] = (sent[k] ?? 0) + t.amount;
+    sent[k] = (sent[k] ?? 0) + t.credit;
   }
 
   final flows = <PairFlow>[];
@@ -164,12 +166,55 @@ List<MemberSummary> memberSummaries(SettlementProject project) {
 int totalSpent(SettlementProject project) =>
     project.expenses.fold(0, (sum, e) => sum + e.amount);
 
-/// 정산 진행률 0.0~1.0 (정산 처리된 채무 줄 비율). 채무가 없으면 1.0.
+/// 정산 진행률 0.0~1.0. **남은 송금액 기준**이라 어떤 방식으로 갚았든 같은 값이 나온다.
+///
+/// 건별로 체크하든, 합계를 한 번에 보내든, 서로 빚이 상쇄되든
+/// "실제로 남은 돈"이 0이면 100%다. [isFullySettled] 와 항상 같은 얘기를 한다
+/// (예전엔 건 체크 수만 세서, 합계 송금으로 갚으면 "완료"인데 0%로 보였다).
 double settledRatio(SettlementProject project) {
   final legs = legsOf(project);
   if (legs.isEmpty) return 1.0;
-  final done = legs.where((l) => l.settled).length;
-  return done / legs.length;
+  final total = legs.fold(0, (sum, l) => sum + l.amount);
+  if (total <= 0) return 1.0;
+  final remaining = pairFlows(project).fold(0, (sum, f) => sum + f.amount);
+  return (1 - remaining / total).clamp(0.0, 1.0);
+}
+
+/// [fromId] → [toId] 로 [amount] 원을 보낼 때 **정산 처리될 채무 건들**.
+///
+/// 오래된 건부터 금액이 딱 맞게 덮이는 데까지만 고른다(건은 쪼개지 않는다).
+/// 남는 돈([TransferCoverage.leftover])은 선입금으로 남아 상계를 움직인다.
+TransferCoverage coverageOf(
+  SettlementProject project,
+  String fromId,
+  String toId,
+  int amount,
+) {
+  final pending = legsOf(project)
+      .where((l) =>
+          !l.settled && l.debtorId == fromId && l.creditorId == toId)
+      .toList()
+    ..sort((a, b) => a.createdAt.compareTo(b.createdAt)); // 오래된 것부터
+
+  final covered = <DebtLeg>[];
+  var left = amount;
+  for (final leg in pending) {
+    if (leg.amount > left) break;
+    covered.add(leg);
+    left -= leg.amount;
+  }
+  return TransferCoverage(legs: covered, applied: amount - left);
+}
+
+/// [coverageOf] 결과.
+class TransferCoverage {
+  /// 이 송금으로 정산 처리될 건들.
+  final List<DebtLeg> legs;
+
+  /// 그 건들에 붙은 금액 합.
+  final int applied;
+
+  const TransferCoverage({required this.legs, required this.applied});
 }
 
 /// 남은 송금이 하나도 없으면 true.

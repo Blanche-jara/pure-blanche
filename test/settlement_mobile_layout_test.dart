@@ -44,12 +44,13 @@ class _StubController extends SettlementController {
   @override
   Future<void> removeExpense(String expenseId) async {}
   @override
-  Future<void> addTransfer({
+  Future<int> addTransfer({
     required String fromId,
     required String toId,
     required int amount,
     String memo = '',
-  }) async {}
+  }) async =>
+      0;
   @override
   Future<void> removeTransfer(String transferId) async {}
   @override

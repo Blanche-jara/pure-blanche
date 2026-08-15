@@ -267,6 +267,166 @@ void main() {
     });
   });
 
+  group('건별 정산과 합계 송금이 하나의 장부로 맞물린다', () {
+    // 30,000원을 a가 결제 → b가 15,000 갚을 빚.
+    SettlementProject withDebt() => _project(expenses: [
+          _expense(
+              id: 'e1', amount: 30000, payer: 'a', participants: ['a', 'b'])
+        ]);
+
+    test('합계 송금은 덮이는 건을 함께 정산 처리한다', () {
+      final p = withDebt();
+      final coverage = coverageOf(p, 'b', 'a', 15000);
+
+      expect(coverage.legs.length, 1);
+      expect(coverage.applied, 15000);
+      expect(coverage.legs.single.debtorId, 'b');
+    });
+
+    test('같은 빚을 송금+건별로 둘 다 처리해도 이중 차감되지 않는다', () {
+      final p = withDebt();
+      final coverage = coverageOf(p, 'b', 'a', 15000);
+
+      // 송금 기록 = 전액이 건에 붙고, 그 건은 정산 처리된다.
+      final afterTransfer = p.copyWith(
+        transfers: [
+          Transfer(
+            id: 't1',
+            fromId: 'b',
+            toId: 'a',
+            amount: 15000,
+            applied: coverage.applied,
+            memo: '',
+            createdAt: _t0,
+          )
+        ],
+        settledLegs: coverage.legs.map((l) => l.key).toSet(),
+      );
+      expect(pairFlows(afterTransfer), isEmpty);
+
+      // 여기서 사용자가 같은 건의 "입금했습니다"를 또 눌러도 그대로 0이어야 한다.
+      // (예전엔 a가 b에게 15,000을 돌려줘야 하는 것으로 뒤집혔다.)
+      final clickedAgain = afterTransfer.copyWith(
+        settledLegs: {...afterTransfer.settledLegs, DebtLeg.legKey('e1', 'b')},
+      );
+      expect(pairFlows(clickedAgain), isEmpty);
+    });
+
+    test('초과 송금분만 선입금으로 남아 방향을 뒤집는다', () {
+      final p = withDebt();
+      final coverage = coverageOf(p, 'b', 'a', 20000); // 5,000 초과
+
+      expect(coverage.applied, 15000); // 건에 붙는 건 딱 15,000
+      final after = p.copyWith(
+        transfers: [
+          Transfer(
+            id: 't1',
+            fromId: 'b',
+            toId: 'a',
+            amount: 20000,
+            applied: coverage.applied,
+            memo: '',
+            createdAt: _t0,
+          )
+        ],
+        settledLegs: coverage.legs.map((l) => l.key).toSet(),
+      );
+
+      final flow = pairFlows(after).single;
+      expect(flow.fromId, 'a'); // a가 5,000 돌려줘야 한다
+      expect(flow.toId, 'b');
+      expect(flow.amount, 5000);
+    });
+
+    test('건은 쪼개지 않는다 — 모자란 송금은 통째로 선입금', () {
+      final p = withDebt();
+      final coverage = coverageOf(p, 'b', 'a', 10000); // 15,000짜리 건에 부족
+
+      expect(coverage.legs, isEmpty);
+      expect(coverage.applied, 0);
+
+      final after = p.copyWith(transfers: [
+        Transfer(
+          id: 't1',
+          fromId: 'b',
+          toId: 'a',
+          amount: 10000,
+          memo: '',
+          createdAt: _t0,
+        )
+      ]);
+      // 빚 15,000 - 선입금 10,000 = 5,000 남는다.
+      expect(pairFlows(after).single.amount, 5000);
+    });
+
+    test('오래된 건부터 덮는다', () {
+      final p = _project(expenses: [
+        _expense(
+            id: 'old', amount: 20000, payer: 'a', participants: ['a', 'b'],
+            dayOffset: 0),
+        _expense(
+            id: 'new', amount: 40000, payer: 'a', participants: ['a', 'b'],
+            dayOffset: 5),
+      ]);
+      // 각각 b가 10,000 / 20,000 갚을 빚. 10,000 보내면 오래된 것만 덮인다.
+      final coverage = coverageOf(p, 'b', 'a', 10000);
+      expect(coverage.legs.single.expenseId, 'old');
+    });
+  });
+
+  group('진행률은 갚은 방식과 무관하게 같은 값을 낸다', () {
+    SettlementProject withDebt() => _project(expenses: [
+          _expense(
+              id: 'e1', amount: 30000, payer: 'a', participants: ['a', 'b'])
+        ]);
+
+    test('건별로 갚으면 100%', () {
+      final p = withDebt()
+          .copyWith(settledLegs: {DebtLeg.legKey('e1', 'b')});
+      expect(settledRatio(p), 1.0);
+      expect(isFullySettled(p), isTrue);
+    });
+
+    test('합계로 갚아도 100% (예전엔 완료 배지와 0% 진행바가 같이 떴다)', () {
+      final p = withDebt();
+      final coverage = coverageOf(p, 'b', 'a', 15000);
+      final after = p.copyWith(
+        transfers: [
+          Transfer(
+            id: 't1',
+            fromId: 'b',
+            toId: 'a',
+            amount: 15000,
+            applied: coverage.applied,
+            memo: '',
+            createdAt: _t0,
+          )
+        ],
+        settledLegs: coverage.legs.map((l) => l.key).toSet(),
+      );
+      expect(isFullySettled(after), isTrue);
+      expect(settledRatio(after), 1.0);
+    });
+
+    test('서로 빚이 상쇄돼도 100%', () {
+      final p = _project(expenses: [
+        _expense(id: 'e1', amount: 20000, payer: 'a', participants: ['a', 'b']),
+        _expense(id: 'e2', amount: 20000, payer: 'b', participants: ['a', 'b']),
+      ]);
+      expect(pairFlows(p), isEmpty);
+      expect(settledRatio(p), 1.0);
+    });
+
+    test('절반만 갚으면 절반', () {
+      final p = _project(expenses: [
+        _expense(id: 'e1', amount: 20000, payer: 'a', participants: ['a', 'b']),
+        _expense(id: 'e2', amount: 20000, payer: 'a', participants: ['a', 'b']),
+      ]);
+      final half = p.copyWith(settledLegs: {DebtLeg.legKey('e1', 'b')});
+      expect(settledRatio(half), 0.5);
+    });
+  });
+
   test('JSON 왕복 직렬화가 상태를 보존한다', () {
     final p = _project(
       expenses: [
@@ -291,6 +451,7 @@ void main() {
     expect(round.members.length, 3);
     expect(round.expenses.single.amount, 97000);
     expect(round.transfers.single.memo, '계좌이체');
+    expect(round.transfers.single.applied, 0);
     expect(round.settledLegs, {DebtLeg.legKey('e1', 'c')});
     expect(pairFlows(round).length, pairFlows(p).length);
   });

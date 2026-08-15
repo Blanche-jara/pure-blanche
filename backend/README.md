@@ -17,8 +17,9 @@ API 계약의 정답은 [`docs/GUESTBOOK_BACKEND.md`](../docs/GUESTBOOK_BACKEND.
 | `src/index.js` | Worker fetch 핸들러 — 방명록·통계 + 라우터 (ES module) |
 | `src/common.js` | CORS/JSON 응답/IP 해시/관리자 인증 (index·settlement 공용) |
 | `src/settlement.js` | SMTM 라우트 `/api/settlement/**` |
-| `smoke_settlement.sh` | SMTM API 인수 기준 48개 검증 스크립트 |
+| `smoke_settlement.sh` | SMTM API 인수 기준 52개 검증 스크립트 |
 | `migrate_settlement_password.sql` | 비밀 프로젝트 컬럼 추가 (기존 DB 1회) |
+| `migrate_transfer_applied.sql` | 송금-건 연결(applied) 컬럼 추가 (기존 DB 1회) |
 
 ## 엔드포인트 요약
 
@@ -146,7 +147,7 @@ curl https://api.pure-blanche.com/api/settlement/zzzzzzzz
 전체 계약을 한 번에 검증하려면(만든 정산표는 끝에 삭제된다):
 
 ```bash
-API=https://api.pure-blanche.com bash smoke_settlement.sh   # 48개 항목
+API=https://api.pure-blanche.com bash smoke_settlement.sh   # 52개 항목
 ```
 
 ### SMTM 비밀 프로젝트 마이그레이션 (기존 DB 1회)

@@ -393,7 +393,7 @@ class _TransferFormState extends State<_TransferForm> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     final amount = int.tryParse(_amount.text.trim()) ?? 0;
     if (_fromId == null || _toId == null) {
       setState(() => _error = '보낸 사람과 받은 사람을 선택해주세요.');
@@ -407,13 +407,21 @@ class _TransferFormState extends State<_TransferForm> {
       setState(() => _error = '금액을 입력해주세요.');
       return;
     }
-    widget.controller.addTransfer(
+
+    // 다이얼로그가 닫힌 뒤에 알려야 하므로 messenger를 미리 잡아둔다.
+    final messenger = ScaffoldMessenger.of(context);
+    Navigator.of(context).pop();
+
+    final settled = await widget.controller.addTransfer(
       fromId: _fromId!,
       toId: _toId!,
       amount: amount,
       memo: _memo.text.trim(),
     );
-    Navigator.of(context).pop();
+    showToastOn(
+      messenger,
+      settled > 0 ? '송금 기록 · $settled건 자동 정산' : '송금 기록 (선입금으로 남음)',
+    );
   }
 
   @override
@@ -433,8 +441,8 @@ class _TransferFormState extends State<_TransferForm> {
             borderRadius: BorderRadius.circular(8),
           ),
           child: const Text(
-            '건별로 "입금했습니다"를 눌러 처리한 돈은 여기 또 적지 않는다. '
-            '이 기록은 건과 상관없이 뭉텅이로 오간 송금 전용이다.',
+            '보낸 금액만큼 오래된 건부터 자동으로 정산 처리된다. '
+            '남는 금액은 선입금으로 남아 다음 정산에서 차감된다.',
             style: TextStyle(
                 fontSize: 12, color: AppColors.parchment, height: 1.55),
           ),

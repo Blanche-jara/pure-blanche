@@ -681,8 +681,16 @@ Future<bool> confirmDialog({
 }
 
 /// 하단 토스트.
-void showToast(BuildContext context, String message, {bool danger = false}) {
-  ScaffoldMessenger.of(context)
+void showToast(BuildContext context, String message, {bool danger = false}) =>
+    showToastOn(ScaffoldMessenger.of(context), message, danger: danger);
+
+/// 다이얼로그를 닫은 뒤처럼 context가 사라진 상황에서 쓰려고 messenger를 직접 받는다.
+void showToastOn(
+  ScaffoldMessengerState messenger,
+  String message, {
+  bool danger = false,
+}) {
+  messenger
     ..clearSnackBars()
     ..showSnackBar(
       SnackBar(

@@ -159,6 +159,8 @@ class SettlementService {
     required int amount,
     String memo = '',
     String? token,
+    int applied = 0,
+    List<({String expenseId, String debtorId})> legs = const [],
   }) async =>
       _projectFrom(await _send('POST', '/api/settlement/$code/transfers',
           token: token,
@@ -167,6 +169,11 @@ class SettlementService {
             'toId': toId,
             'amount': amount,
             'memo': memo,
+            'applied': applied,
+            'legs': [
+              for (final l in legs)
+                {'expenseId': l.expenseId, 'debtorId': l.debtorId}
+            ],
           }));
 
   Future<SettlementProject> removeTransfer(String code, String transferId,

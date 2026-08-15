@@ -11,6 +11,7 @@ library;
 import 'package:flutter/foundation.dart';
 
 import '../../services/settlement_service.dart';
+import 'engine.dart';
 import 'models.dart';
 import 'store.dart';
 
@@ -51,7 +52,9 @@ abstract class SettlementController extends ChangeNotifier {
 
   Future<void> removeExpense(String expenseId);
 
-  Future<void> addTransfer({
+  /// 송금을 기록한다. 이 돈이 덮는 채무 건은 **함께 정산 처리**된다.
+  /// 반환값은 그렇게 자동 정산된 건 수(0이면 순수 선입금).
+  Future<int> addTransfer({
     required String fromId,
     required String toId,
     required int amount,
@@ -125,7 +128,7 @@ class LocalSettlementController extends SettlementController {
       store.removeExpense(projectId, expenseId);
 
   @override
-  Future<void> addTransfer({
+  Future<int> addTransfer({
     required String fromId,
     required String toId,
     required int amount,
@@ -259,20 +262,33 @@ class RemoteSettlementController extends SettlementController {
       _run(() => service.removeExpense(code, expenseId, token: accessToken));
 
   @override
-  Future<void> addTransfer({
+  Future<int> addTransfer({
     required String fromId,
     required String toId,
     required int amount,
     String memo = '',
-  }) =>
-      _run(() => service.addTransfer(
-            code,
-            fromId: fromId,
-            toId: toId,
-            amount: amount,
-            memo: memo,
-            token: accessToken,
-          ));
+  }) async {
+    // 어떤 건이 덮이는지는 클라이언트가 계산한다(분할 규칙은 engine.dart 한 곳).
+    final current = _project;
+    final coverage = current == null
+        ? const TransferCoverage(legs: [], applied: 0)
+        : coverageOf(current, fromId, toId, amount);
+
+    await _run(() => service.addTransfer(
+          code,
+          fromId: fromId,
+          toId: toId,
+          amount: amount,
+          memo: memo,
+          token: accessToken,
+          applied: coverage.applied,
+          legs: [
+            for (final l in coverage.legs)
+              (expenseId: l.expenseId, debtorId: l.debtorId)
+          ],
+        ));
+    return _error == null ? coverage.legs.length : 0;
+  }
 
   @override
   Future<void> removeTransfer(String transferId) =>

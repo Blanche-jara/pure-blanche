@@ -11,6 +11,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+import 'engine.dart';
 import 'models.dart';
 
 const _storageKey = 'pb_settlement_v1';
@@ -376,7 +377,10 @@ class SettlementStore extends ChangeNotifier {
 
   // ─────────────────────────── 직접 송금 ───────────────────────────
 
-  void addTransfer(
+  /// 송금을 기록하면서, 그 돈이 덮는 채무 건들을 **함께 정산 처리**한다.
+  /// 장부를 하나로 유지해 같은 돈이 두 번 빠지는 걸 막는다.
+  /// 반환값은 자동 정산된 건 수.
+  int addTransfer(
     String projectId, {
     required String fromId,
     required String toId,
@@ -384,7 +388,10 @@ class SettlementStore extends ChangeNotifier {
     String memo = '',
   }) {
     final p = byId(projectId);
-    if (p == null) return;
+    if (p == null) return 0;
+
+    final coverage = coverageOf(p, fromId, toId, amount);
+
     _update(p.copyWith(
       transfers: [
         ...p.transfers,
@@ -393,11 +400,14 @@ class SettlementStore extends ChangeNotifier {
           fromId: fromId,
           toId: toId,
           amount: amount,
+          applied: coverage.applied,
           memo: memo,
           createdAt: DateTime.now(),
         ),
       ],
+      settledLegs: {...p.settledLegs, ...coverage.legs.map((l) => l.key)},
     ));
+    return coverage.legs.length;
   }
 
   void removeTransfer(String projectId, String transferId) {

@@ -98,6 +98,12 @@ class Transfer {
   final String fromId;
   final String toId;
   final int amount;
+
+  /// 이 송금 중 **특정 채무 건에 붙은 금액**. 기록할 때 그만큼의 건이
+  /// 정산 처리됐으므로, 상계에서는 나머지(`amount - applied`)만 다시 뺀다.
+  /// 이게 없으면 같은 돈이 "건 정산"과 "송금 차감"으로 두 번 빠진다.
+  final int applied;
+
   final String memo;
   final DateTime createdAt;
 
@@ -108,13 +114,18 @@ class Transfer {
     required this.amount,
     required this.memo,
     required this.createdAt,
+    this.applied = 0,
   });
+
+  /// 어떤 건에도 붙지 않고 남은 돈(선입금). 상계를 움직이는 건 이 값뿐이다.
+  int get credit => amount - applied;
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'fromId': fromId,
         'toId': toId,
         'amount': amount,
+        if (applied != 0) 'applied': applied,
         'memo': memo,
         'createdAt': createdAt.toIso8601String(),
       };
@@ -124,6 +135,7 @@ class Transfer {
         fromId: j['fromId'] as String,
         toId: j['toId'] as String,
         amount: (j['amount'] as num).toInt(),
+        applied: (j['applied'] as num?)?.toInt() ?? 0,
         memo: (j['memo'] as String?) ?? '',
         createdAt: parseTime(j['createdAt'] as String),
       );
