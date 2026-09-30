@@ -106,6 +106,11 @@ class PureBlancheApp extends StatelessWidget {
               trackId: 'word-finder',
               htmlPath: 'apps/word-finder/index.html',
             ),
+        // Windows 프로그램의 설명·다운로드 페이지. trackId 없음: /api/hit 슬러그 화이트리스트에 아직 없다.
+        '/app/lecture-mp3': (_) => const HtmlAppPage(
+              title: '강의 MP3 다운로더',
+              htmlPath: 'apps/lecture-mp3/index.html',
+            ),
       },
     );
   }

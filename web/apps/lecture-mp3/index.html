@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>강의 MP3 다운로더 — Pure Blanche</title>
+<meta name="description" content="온라인 강의를 MP3로 받고, 화면을 캡처하고, 받아쓰고, 요약하는 Windows 프로그램">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Pure Blanche design tokens (design/DESIGN.md) */
+  :root {
+    --abyss: #050507; --carbon: #101010; --charcoal: #3d3a39; --green: #00d992; --mint: #2fd6a1;
+    --snow: #f2f2f2; --parchment: #b8b3b0; --steel: #8b949e; --warning: #ffba00;
+    --head: system-ui, -apple-system, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    --body: Inter, system-ui, -apple-system, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    --mono: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--abyss); }
+  body { margin: 0; color: var(--parchment); font: 16px/1.65 var(--body); font-feature-settings: "calt", "rlig";
+         word-break: keep-all; overflow-wrap: anywhere; }
+  main { max-width: 960px; margin: 0 auto; padding: 56px 24px 96px; }
+  a { color: var(--mint); }
+  b { color: var(--snow); font-weight: 600; }
+  .overline { font: 600 14px/1.43 var(--head); letter-spacing: 2.52px; text-transform: uppercase; color: var(--green); }
+  h1 { font: 400 clamp(40px, 7vw, 60px)/1.0 var(--head); letter-spacing: -0.65px; color: var(--snow); margin: 16px 0 20px; }
+  h2 { font: 400 clamp(28px, 4vw, 36px)/1.11 var(--head); letter-spacing: -0.9px; color: var(--snow); margin: 8px 0 24px; }
+  h3 { font: 600 18px/1.4 var(--body); color: var(--snow); margin: 0 0 8px; }
+  .lead { font-size: 18px; max-width: 640px; margin: 0; }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 32px 0 12px; }
+  .button { display: inline-flex; align-items: center; gap: 8px; padding: 12px 16px; border-radius: 6px;
+            font: 600 16px/1.5 var(--body); text-decoration: none; transition: background .2s, border-color .2s, outline-color .2s; }
+  .button svg { width: 18px; height: 18px; }
+  .primary { background: var(--carbon); color: var(--mint); outline: 1px solid var(--mint); }
+  .primary:hover { background: rgba(0, 217, 146, .12); outline-color: var(--green); }
+  .ghost { color: var(--snow); border: 1px solid var(--charcoal); }
+  .ghost:hover { border-color: var(--green); }
+  .meta { font: 13px/1.5 var(--mono); color: var(--steel); }
+  .shot { margin: 48px 0 0; border: 1px solid var(--charcoal); border-radius: 8px; overflow: hidden;
+          box-shadow: rgba(0, 0, 0, .7) 0 20px 60px, rgba(148, 163, 184, .1) 0 0 0 1px inset; }
+  .shot img { display: block; width: 100%; height: auto; }
+  section { margin-top: 72px; }
+  section > p { max-width: 760px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .card { background: var(--carbon); border: 1px solid var(--charcoal); border-radius: 8px; padding: 24px; transition: border-color .25s; }
+  .card:hover { border-color: var(--green); }
+  .card p { margin: 0; font-size: 14px; }
+  .tag { display: inline-block; margin-top: 12px; padding: 2px 10px; border: 1px solid var(--charcoal); border-radius: 9999px;
+         font: 12px/1.6 var(--mono); color: var(--steel); }
+  ol.steps { counter-reset: step; list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+  ol.steps li { counter-increment: step; position: relative; background: var(--carbon); border: 1px solid var(--charcoal);
+                border-radius: 8px; padding: 18px 20px 18px 64px; font-size: 15px; }
+  ol.steps li::before { content: counter(step); position: absolute; left: 20px; top: 17px; width: 28px; height: 28px;
+                        border: 1px solid var(--green); border-radius: 9999px; color: var(--green);
+                        font: 600 14px/26px var(--mono); text-align: center; }
+  code { font: 13px var(--mono); color: var(--snow); background: var(--carbon); border: 1px solid var(--charcoal);
+         border-radius: 4px; padding: 1px 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  th, td { text-align: left; vertical-align: top; padding: 14px 16px; border-bottom: 1px solid var(--charcoal); }
+  th { width: 28%; color: var(--snow); font-weight: 600; }
+  .note { max-width: 760px; margin-top: 20px; padding: 12px 16px; border-left: 2px solid var(--warning);
+          border-radius: 0 6px 6px 0; background: rgba(255, 186, 0, .06); font-size: 14px; }
+  footer { margin-top: 80px; padding-top: 24px; border-top: 1px solid var(--charcoal); font-size: 13px; color: var(--steel); }
+  @media (max-width: 600px) {
+    main { padding: 40px 16px 72px; }
+    ol.steps li { padding-left: 56px; }
+    th { width: 34%; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="overline">Windows App</div>
+  <h1>강의 MP3 다운로더</h1>
+  <p class="lead">온라인 강의를 MP3로 받고, 강의 화면을 캡처하고, 받아쓰고, 요약까지.
+    복습에 필요한 걸 한 프로그램에서 합니다.</p>
+  <div class="cta">
+    <a class="button primary" href="https://github.com/Blanche-jara/lecture-mp3-release/releases/download/v1.0.0/LectureMP3-Setup-1.0.0.exe">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7.5 10.5 12 15l4.5-4.5"/><path d="M5 19.5h14"/></svg>
+      설치 파일 받기
+    </a>
+    <a class="button ghost" href="https://github.com/Blanche-jara/lecture-mp3-release/releases" target="_blank" rel="noopener">모든 버전</a>
+  </div>
+  <div class="meta">버전 1.0.0 · 44MB · Windows 10/11 64비트</div>
+  <figure class="shot">
+    <img src="app-window.png" width="1060" height="470"
+         alt="프로그램 화면: 강의를 받는 중, 받아쓰는 중, 화면 캡처와 교정본까지 끝난 강의가 목록에 보인다">
+  </figure>
+
+  <section>
+    <div class="overline">Features</div>
+    <h2>하는 일</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>강의 → MP3</h3>
+        <p>강의 영상 주소(m3u8 · mp4)나 크롬 확장으로 받아 MP3로 저장합니다. 여러 개를 동시에 받고 목록으로 관리합니다.</p>
+      </div>
+      <div class="card">
+        <h3>화면 캡처</h3>
+        <p>슬라이드·코드 화면이 바뀔 때마다 캡처해 이미지와 시간표로 남깁니다. 영상을 따로 더 받지 않습니다.</p>
+      </div>
+      <div class="card">
+        <h3>받아쓰기</h3>
+        <p>이 컴퓨터에서 Whisper로 받아씁니다. 45분 강의에 20분쯤(6코어 노트북 기준). 읽기 화면에서 시간을 누르면 그 부분부터 재생됩니다.</p>
+        <span class="tag">선택 설치</span>
+      </div>
+      <div class="card">
+        <h3>교정</h3>
+        <p>잘못 들은 전문용어·숫자·띄어쓰기를 Claude Code가 바로잡습니다. 화면 캡처가 있으면 슬라이드를 보고 용어를 맞춥니다.</p>
+        <span class="tag">선택 설치 · Claude Pro</span>
+      </div>
+      <div class="card">
+        <h3>강의노트</h3>
+        <p>받아쓰기와 캡처 화면을 시간순으로 합친 .md 파일을 만듭니다. 복습하거나 요약을 맡기기 좋습니다.</p>
+      </div>
+      <div class="card">
+        <h3>요약</h3>
+        <p>1강·2강·3강처럼 나뉜 강의도 하나로 요약합니다. 짧게(배운 점 위주) 또는 자세히(내용 정리).</p>
+        <span class="tag">선택 설치 · Claude Pro</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="overline">Install</div>
+    <h2>설치</h2>
+    <ol class="steps">
+      <li><b>설치 파일을 실행합니다.</b> 관리자 권한은 필요 없습니다. "Windows의 PC 보호" 창이 뜨면
+        <b>추가 정보 → 실행</b>을 누르세요. 코드 서명을 하지 않은 프로그램이라 뜨는 창입니다.</li>
+      <li><b>쓸 기능을 고릅니다.</b> MP3 받기 · 화면 캡처 · 크롬 확장은 항상 설치되고, 받아쓰기와 교정·요약은 골라서 설치합니다.</li>
+      <li><b>설치가 끝나면 프로그램이 열리면서 고른 기능을 설치합니다.</b> 받아쓰기 부품(약 90MB)을 내려받아 확인하고,
+        Claude Code는 공식 설치 창과 로그인 창이 차례로 열립니다.</li>
+      <li><b>나중에 바꾸려면</b> 설정(오른쪽 위 맨 끝 버튼) → <b>기능 관리…</b>에서 설치하거나 제거합니다.</li>
+    </ol>
+  </section>
+
+  <section>
+    <div class="overline">Chrome Extension</div>
+    <h2>크롬 확장으로 더 쉽게</h2>
+    <p>강의 영상을 재생하면 확장이 영상 주소를 찾아 프로그램으로 보내 줍니다. 처음 한 번만 설치하면 됩니다.</p>
+    <ol class="steps">
+      <li>크롬 주소창에 <code>chrome://extensions</code>를 입력하고 오른쪽 위 <b>개발자 모드</b>를 켭니다.</li>
+      <li><b>압축해제된 확장 프로그램을 로드합니다</b>를 누르고 설치 폴더 안의 <code>chrome-extension</code> 폴더를 고릅니다.
+        프로그램의 <b>?</b> 버튼 도움말에 이 폴더로 가는 링크가 있습니다.</li>
+      <li>주소창 옆 퍼즐 아이콘에서 <b>강의 MP3 받기</b>를 고정합니다. 이제 강의를 재생하고 아이콘 → <b>앱으로 보내서 받기</b>를 누르면 됩니다.</li>
+    </ol>
+  </section>
+
+  <section>
+    <div class="overline">Requirements</div>
+    <h2>필요한 것</h2>
+    <table>
+      <tr><th>기본</th><td>Windows 10/11 64비트</td></tr>
+      <tr><th>받아쓰기</th><td>디스크 약 2GB(부품 약 230MB + 음성인식 모델 약 1.6GB). 처음 한 번 인터넷으로 받습니다. 그래픽카드는 필요 없습니다.</td></tr>
+      <tr><th>교정·요약</th><td><a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a>와 Claude Pro 이상 요금제
+        (무료 요금제로는 쓸 수 없습니다). 쓰는 사람의 Claude 사용량에서 차감됩니다.</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <div class="overline">Notes</div>
+    <h2>알아둘 점</h2>
+    <p>받은 강의는 <code>문서\강의 MP3</code>에, 목록과 설정은 사용자 앱 데이터 폴더에 저장됩니다. 프로그램을 지우거나 업데이트해도 그대로 남습니다.</p>
+    <p>강의 영상 주소에는 유효기간이 있어 시간이 지나면 받아지지 않을 수 있습니다. 그때는 강의 페이지에서 주소를 새로 복사해
+      항목을 우클릭 → <b>새 주소로 다시 받기</b>를 누르세요.</p>
+    <div class="note">받은 강의 파일과 받아쓴 글은 본인 학습용으로만 쓰고 다른 사람에게 나누지 마세요. 강의의 저작권은 강의를 만든 분께 있습니다.</div>
+  </section>
+
+  <section>
+    <div class="overline">Changelog</div>
+    <h2>버전 기록</h2>
+    <table>
+      <tr><th>1.0.0 · 2026-09-30</th><td>첫 배포판. MP3 받기, 화면 캡처, 받아쓰기·교정, 강의노트, 요약, 설치할 때 기능 고르기.</td></tr>
+    </table>
+  </section>
+
+  <footer>
+    FFmpeg(GPLv3) 등 함께 들어 있는 소프트웨어의 라이선스는 설치 폴더의 <code>THIRD-PARTY-NOTICES.txt</code>와
+    <code>tools\FFMPEG-README.txt</code>에 있습니다.<br>
+    설치 파일과 받아쓰기 부품:
+    <a href="https://github.com/Blanche-jara/lecture-mp3-release" target="_blank" rel="noopener">github.com/Blanche-jara/lecture-mp3-release</a>
+  </footer>
+</main>
+</body>
+</html>

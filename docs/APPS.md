@@ -1,16 +1,17 @@
 # Pure Blanche — 코드 프로젝트 서브앱 레퍼런스
 
-> `/code`(`CodeProjectsPage`)에 카드로 노출되는 **11개 코드 프로젝트**의 상세 레퍼런스다.
+> `/code`(`CodeProjectsPage`)에 카드로 노출되는 **12개 코드 프로젝트**의 상세 레퍼런스다.
 > 출처: `lib/pages/code_projects_page.dart`(카드 데이터) + `lib/main.dart`(라우트) + 각 앱 디렉터리.
 > 라우팅·디자인 등 사이트 전체 구조는 [ARCHITECTURE.md](./ARCHITECTURE.md)(특히 3장 라우트, 6장 서브앱 요약) 참조.
 > 코드와 이 문서가 다르면 코드가 정답이며, 발견 즉시 고친다.
 
 ## 개요
 
-총 11개. 실행 방식은 두 가지다.
+총 12개. 실행 방식은 두 가지다.
 
 - **Flutter 인앱(7개)**: `lib/apps/<name>/`의 Dart 위젯을 `AppWrapper`(상단 뒤로가기 바)로 감싸 라우트에 직접 연결.
-- **HTML/사전빌드 임베드(4개)**: `web/apps/<name>/`의 정적 산출물을 `HtmlAppPage`(`lib/apps/web_embed/html_app_page.dart`)가 `iframe`(HtmlElementView)으로 로드.
+- **HTML/사전빌드 임베드(5개)**: `web/apps/<name>/`의 정적 산출물을 `HtmlAppPage`(`lib/apps/web_embed/html_app_page.dart`)가 `iframe`(HtmlElementView)으로 로드.
+  이 중 강의 MP3 다운로더는 사이트에서 실행하는 앱이 아니라 Windows 프로그램의 소개·다운로드 페이지다.
 
 | 앱 | 라우트 | 타입 | 위치 | 한 줄 목적 | 외부 링크 |
 |----|--------|------|------|-----------|-----------|
@@ -25,6 +26,7 @@
 | Word Guesser | `/app/word-guesser` | Web(사전빌드 Flutter) | `web/apps/word-guesser/` | 한글 워들(풀어쓰기) 솔버 | — |
 | Word Finder | `/app/word-finder` | Web(사전빌드 Flutter) | `web/apps/word-finder/` | 꼬맨틀(한국어 Semantle) 추측 보조기 | — |
 | SMTM | `/settlement` | Flutter + D1 | `lib/apps/settlement/` | 모임 정산표 — 누가 누구에게 얼마 보낼지 정리 | — |
+| 강의 MP3 다운로더 | `/app/lecture-mp3` | Windows 프로그램(소개 페이지는 HTML) | `web/apps/lecture-mp3/` | 온라인 강의 → MP3·화면 캡처·받아쓰기·요약 | [EXE](https://github.com/Blanche-jara/lecture-mp3-release/releases/download/v1.0.0/LectureMP3-Setup-1.0.0.exe) · [Releases](https://github.com/Blanche-jara/lecture-mp3-release/releases) |
 
 ---
 
@@ -179,6 +181,14 @@ PBKDF2-SHA256 10만 회로 해시만 저장하고, 통과하면 받은 접근 �
 - **기술/패키지**: 사전빌드 **Flutter Web**, Dart, fastText 임베딩(int8 양자화).
 - **주요 파일**(`web/apps/word-finder/`): `index.html`, `main.dart.js`, `canvaskit/`, 임베딩 데이터 `assets/assets/` — `vecs.i8`(int8 벡터), `scales.f32`, `vocab.txt`, `answers.txt`, `meta.txt`. `htmlPath: 'apps/word-finder/index.html'`.
 
+### 강의 MP3 다운로더 — `/app/lecture-mp3`
+
+- **목적**: Windows 프로그램 "강의 MP3 다운로더"의 소개·다운로드 페이지. 프로그램은 온라인 강의 영상(m3u8·mp4)을 MP3로 받고, 슬라이드·코드 화면을 캡처하고, 이 컴퓨터에서 받아쓴 뒤 Claude Code로 교정·요약한다.
+- **핵심 기능(프로그램)**: 크롬 확장으로 재생 중인 강의를 앱에 보내기 / 화면 캡처 + 시간표 / Whisper 받아쓰기 + Claude 교정 / 받아쓰기와 캡처를 합친 강의노트(.md) / 요약 / 설치 마법사에서 필요한 기능만 선택.
+- **기술/패키지(프로그램)**: Python, PySide6, FFmpeg, faster-whisper, Claude Code CLI, PyInstaller, Inno Setup. 소스는 비공개 저장소 `lecture-mp3`.
+- **배포**: 공개 저장소 `Blanche-jara/lecture-mp3-release`(소스 없음)의 GitHub Releases. `LectureMP3-Setup-<버전>.exe`(설치 파일)와 `transcriber-<버전>.zip`(받아쓰기 부품, 프로그램이 SHA-256 확인 후 설치). 새 버전을 내면 `index.html`의 다운로드 링크·버전·크기·변경 기록과 카드의 `downloadUrl`을 함께 고친다.
+- **주요 파일**(`web/apps/lecture-mp3/`): `index.html`(외부 의존 없는 한 파일, 사이트 디자인 토큰을 CSS 변수로 옮김), `app-window.png`(프로그램 화면). `htmlPath: 'apps/lecture-mp3/index.html'`. `trackId` 없음(`/api/hit` 슬러그 화이트리스트에 아직 없음).
+
 ---
 
 ## 카드 메타데이터 형식 (참고)
@@ -190,7 +200,7 @@ PBKDF2-SHA256 10만 회로 해시만 저장하고, 통과하면 받은 접근 �
 | `title` / `subtitle` | 제목 / 폴더명(Consolas 표기) |
 | `description` / `features` | 설명 문단 / 기능 불릿(보통 4개) |
 | `techTags` | 기술 태그 칩 |
-| `icon` / `type` | 아이콘 / `"flutter"`·`"web"` 배지 |
+| `icon` / `type` | 아이콘 / `"flutter"`(Flutter App)·`"web"`(Web)·`"windows"`(Windows App) 배지 |
 | `route` | 탭 시 `Navigator.pushNamed` 대상 |
-| `downloadUrl` / `downloadLabel` | (선택) 다운로드 버튼 URL / 라벨(기본 `APK`, CANNON은 `EXE`) |
+| `downloadUrl` / `downloadLabel` | (선택) 다운로드 버튼 URL / 라벨(기본 `APK`, CANNON·강의 MP3 다운로더는 `EXE`) |
 | `privacyUrl` / `patchNotesUrl` | (선택) 카드 하단 정책·패치노트 링크 (현재 Who's the Nut?만 사용) |

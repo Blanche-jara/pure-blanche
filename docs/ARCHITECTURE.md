@@ -27,12 +27,12 @@ Flutter Web 단일 페이지 앱(SPA)으로 만든 **Blanche의 개인 포트폴
 
 ## 3. 라우팅 (`lib/main.dart`)
 
-`MaterialApp.routes`로 정의된 14개 named route. `debugShowCheckedModeBanner: false`, `theme: AppTheme.dark`, `initialRoute: '/'`.
+`MaterialApp.routes`로 정의된 17개 named route. `debugShowCheckedModeBanner: false`, `theme: AppTheme.dark`, `initialRoute: '/'`.
 
 | Path | 위젯 | 설명 |
 |------|------|------|
 | `/` | `MainPage` | 2-page 세로 스냅: 히어로 + 3 네비카드. 첫 방문 시 인트로 영상 |
-| `/code` | `CodeProjectsPage` | 코드 프로젝트 11개 카드 |
+| `/code` | `CodeProjectsPage` | 코드 프로젝트 12개 카드 |
 | `/video` | `VideoProjectsPage` | 영상 연대표 (7개 시대 풀페이지 스냅) |
 | `/guestbook` | `GuestbookPage` | 방명록 (Cloudflare Workers+D1 연동) |
 | `/admin` | `GuestbookPage(adminEntry:true)` | 숨김 관리자 진입 (비밀번호 → 방명록 관리/접속 통계 탭) |
@@ -46,6 +46,7 @@ Flutter Web 단일 페이지 앱(SPA)으로 만든 **Blanche의 개인 포트폴
 | `/app/birthday` | `HtmlAppPage` | 자라 생일 선물 리스트 (HTML iframe) |
 | `/app/word-guesser` | `HtmlAppPage` | 한글 워들 솔버 (사전빌드된 Flutter Web을 iframe) |
 | `/app/word-finder` | `HtmlAppPage` | Semantle 헬퍼 (사전빌드된 Flutter Web을 iframe) |
+| `/app/lecture-mp3` | `HtmlAppPage` | 강의 MP3 다운로더 — Windows 프로그램 소개·다운로드 페이지 (HTML iframe) |
 | `/settlement` | `AppWrapper`+`SettlementApp` | **SMTM** — 모임 정산표 |
 | `/settlement/<코드>` | `AppWrapper`+`SettlementApp(code:)` | SMTM 공유 링크. `onGenerateRoute` 로 처리(값이 든 경로라 routes 맵 정확일치로는 못 잡음) |
 
@@ -71,7 +72,7 @@ pure-blanche/
 ├── apps_src/                  # 사전빌드 임베드 앱 소스 (word-guesser) — apps_src/README.md
 ├── web/
 │   ├── index.html, CNAME      # CNAME = pure-blanche.com
-│   └── apps/                  # jamakase / birthday / word-guesser / word-finder / whos-the-nut(정책) ...
+│   └── apps/                  # jamakase / birthday / word-guesser / word-finder / lecture-mp3 / whos-the-nut(정책) ...
 ├── .github/workflows/deploy.yml
 └── pubspec.yaml
 ```
@@ -84,8 +85,8 @@ pure-blanche/
 - 반응형 기준 768px.
 
 ### 5.2 CodeProjectsPage (`lib/pages/code_projects_page.dart`)
-- Wrap 그리드(데스크톱 2열 / 모바일 1열, 기준 600px), 카드 11개.
-- 카드: 아이콘+타입배지, 제목, 폴더명(Consolas), 설명, 기능 4줄, 기술 태그, (선택)다운로드 버튼/정책·패치노트 링크.
+- Wrap 그리드(데스크톱 2열 / 모바일 1열, 기준 600px), 카드 12개.
+- 카드: 아이콘+타입배지(Flutter App / Web / Windows App), 제목, 폴더명(Consolas), 설명, 기능 4줄, 기술 태그, (선택)다운로드 버튼/정책·패치노트 링크.
 - 클릭 → `Navigator.pushNamed(route)`. 호버 시 border→signalGreen + 글로우.
 - 앱별 상세는 [APPS.md](./APPS.md) 참조.
 
@@ -131,7 +132,7 @@ pure-blanche/
 | `web_embed/` | (래퍼) | `html_app_page.dart` — HTML/사전빌드 앱 iframe 임베드 |
 | `app_wrapper.dart` | (래퍼) | 모든 Flutter 서브앱 공통 뒤로가기 바 |
 
-`web/apps/`의 HTML 프로젝트: `jamakase/`, `birthday/`, `word-guesser/`(사전빌드 Flutter Web), `word-finder/`(사전빌드 Flutter Web + 임베딩 데이터), `whos-the-nut/`(개인정보처리방침·패치노트 HTML).
+`web/apps/`의 HTML 프로젝트: `jamakase/`, `birthday/`, `word-guesser/`(사전빌드 Flutter Web), `word-finder/`(사전빌드 Flutter Web + 임베딩 데이터), `lecture-mp3/`(Windows 프로그램 소개·다운로드 페이지), `whos-the-nut/`(개인정보처리방침·패치노트 HTML).
 
 ## 7. 디자인 시스템
 

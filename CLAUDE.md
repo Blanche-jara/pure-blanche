@@ -7,7 +7,7 @@ Blanche의 유틸리티 집합소 웹사이트. Flutter Web으로 구축.
 > 빠른 참조용 하네스이며, 충돌 시 `docs/`가 정답이다.
 > - `docs/README.md` — 문서 인덱스 (여기부터 읽기)
 > - `docs/ARCHITECTURE.md` — 라우팅·페이지·서브앱·디자인·배포 전체 구조
-> - `docs/APPS.md` — 코드 프로젝트 11개 서브앱 상세 레퍼런스
+> - `docs/APPS.md` — 코드 프로젝트 12개 서브앱 상세 레퍼런스
 > - `docs/GUESTBOOK_BACKEND.md` — 방명록 백엔드 설계 + API 계약
 > - `docs/SETTLEMENT_BACKEND.md` — 정산표 백엔드 설계 + API 계약
 > - `docs/TODO.md` — 작업 로드맵
@@ -48,13 +48,13 @@ pure-blanche/
 ├── docs/                      # 상세 명세 (SSOT): README/ARCHITECTURE/APPS/GUESTBOOK_BACKEND/TODO/PARALLEL_TASKS
 ├── backend/                   # 방명록 API — Cloudflare Worker + D1 (docs/GUESTBOOK_BACKEND.md)
 ├── lib/
-│   ├── main.dart              # 앱 엔트리, 전체 라우팅 정의 (14개 라우트)
+│   ├── main.dart              # 앱 엔트리, 전체 라우팅 정의 (17개 라우트)
 │   ├── theme/
 │   │   ├── app_colors.dart        # 디자인 토큰 색상 상수
 │   │   └── app_theme.dart         # ThemeData + 타이포그래피
 │   ├── pages/
 │   │   ├── main_page.dart             # 메인 (히어로 + 3개 네비카드)
-│   │   ├── code_projects_page.dart    # 코드 프로젝트 11개 카드 → 각 앱 실행
+│   │   ├── code_projects_page.dart    # 코드 프로젝트 12개 카드 → 각 앱 실행
 │   │   ├── video_projects_page.dart   # 영상 연대표 (풀페이지 스냅 + 타임라인)
 │   │   └── guestbook_page.dart        # 방명록 (백엔드 연동)
 │   ├── services/                  # 프론트 서비스 레이어 (guestbook_service.dart 등 — 방명록 API 호출)
@@ -86,6 +86,7 @@ pure-blanche/
 │       ├── birthday/index.html            # 자라 생일 선물 리스트
 │       ├── word-guesser/                  # 사전빌드 Flutter Web (한글 워들 솔버)
 │       ├── word-finder/                   # 사전빌드 Flutter Web (꼬맨틀 헬퍼 + 임베딩 데이터)
+│       ├── lecture-mp3/index.html + app-window.png  # 강의 MP3 다운로더 소개·다운로드 (Windows 프로그램)
 │       ├── whos-the-nut/                  # 개인정보처리방침 · 패치노트 HTML
 │       └── video-player.html              # Google Drive preview iframe 래퍼
 ├── .github/
@@ -96,15 +97,16 @@ pure-blanche/
 
 ## Routes
 
-전체 15개 named route (`lib/main.dart`) + 공유 정산표용 `onGenerateRoute` 1개.
-코드 프로젝트는 11개(`/app/*` 10개 + `/settlement`). 앱별 상세는 `docs/APPS.md`.
+전체 17개 named route (`lib/main.dart`) + 공유 정산표용 `onGenerateRoute` 1개.
+코드 프로젝트는 12개(`/app/*` 11개 + `/settlement`). 앱별 상세는 `docs/APPS.md`.
 
 | Path | Page | 설명 |
 |------|------|------|
 | `/` | `MainPage` | 2-page 스냅 스크롤: 히어로 소개 (Page 0) + 3개 네비카드 & 푸터 (Page 1). 첫 접속 시 인트로 영상 재생 (sessionStorage 기반) |
-| `/code` | `CodeProjectsPage` | 코드 프로젝트 11개 카드 → 클릭 시 각 앱 실행 |
+| `/code` | `CodeProjectsPage` | 코드 프로젝트 12개 카드 → 클릭 시 각 앱 실행 |
 | `/video` | `VideoProjectsPage` | 영상 연대표 (7개 시대, 풀페이지 스냅) |
 | `/guestbook` | `GuestbookPage` | 방명록 — Cloudflare Workers + D1 백엔드 연동 (`docs/GUESTBOOK_BACKEND.md`) |
+| `/admin` | `GuestbookPage(adminEntry: true)` | 숨김 관리자 진입 (비밀번호 → 방명록 관리/접속 통계 탭) |
 | `/app/jara-holdem` | `AppWrapper` + `JaraHoldemApp` | 포커 토너먼트 타이머 (Flutter) |
 | `/app/roulette` | `AppWrapper` + `RouletteAppEntry` | 자마카세 인원뽑기 룰렛 (Flutter) |
 | `/app/whos-the-nut` | `AppWrapper` + `WhosTheNutApp` | 너트 핸드 평가기 (Flutter) |
@@ -115,6 +117,7 @@ pure-blanche/
 | `/app/birthday` | `HtmlAppPage` | 자라 생일 선물 리스트 (HTML iframe) |
 | `/app/word-guesser` | `HtmlAppPage` | 한글 워들 솔버 (사전빌드 Flutter Web iframe) |
 | `/app/word-finder` | `HtmlAppPage` | 꼬맨틀(Semantle) 헬퍼 (사전빌드 Flutter Web iframe) |
+| `/app/lecture-mp3` | `HtmlAppPage` | 강의 MP3 다운로더 — Windows 프로그램 소개·다운로드 (HTML iframe) |
 | `/settlement` | `AppWrapper` + `SettlementApp` | **SMTM** — 모임 정산표 (Flutter + D1) |
 | `/settlement/<코드>` | 위와 동일(`code:`) | SMTM 공유 링크 (`onGenerateRoute`) |
 
@@ -143,6 +146,7 @@ flutter build web             # 프로덕션 빌드 → build/web/
 - 영상 임베드: YouTube `youtube-nocookie.com/embed/{ID}` iframe 사용
 - 영상 썸네일: `img.youtube.com/vi/{ID}/mqdefault.jpg`
 - 사전빌드 Flutter Web 앱(word-guesser/word-finder)은 `web/apps/<name>/`에 산출물을 두고 `HtmlAppPage`로 임베드
+- 사이트에서 실행할 수 없는 Windows 프로그램(lecture-mp3)은 `web/apps/<name>/`에 소개·다운로드 페이지만 두고 카드 `type: 'windows'`(Windows App 배지). 설치 파일은 별도 공개 저장소의 GitHub Releases에서 받는다
 
 ## Main Page Architecture
 

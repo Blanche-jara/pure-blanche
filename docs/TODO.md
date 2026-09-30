@@ -1,12 +1,12 @@
 # Pure Blanche — TODO 로드맵
 
 > 현재 상태 기준. 완료 항목은 [ARCHITECTURE.md](./ARCHITECTURE.md)에 사실로 반영됨.
-> 최종 갱신: 2026-08-13 (SMTM 배포)
+> 최종 갱신: 2026-09-30 (강의 MP3 다운로더 소개 페이지)
 
 ## ✅ 완료
 
 - 기본 구조: 디자인 시스템(`AppColors`/`AppTheme`), `MainPage` 히어로+네비카드, `PageScaffold`.
-- 코드 프로젝트: **11개** 앱 통합 (Flutter 7 + HTML/사전빌드 4). 카드/배지/다운로드 링크.
+- 코드 프로젝트: **12개** 앱 통합 (Flutter 7 + HTML/사전빌드 5). 카드/배지/다운로드 링크.
 - 영상 연대표: 7개 시대 풀페이지 스냅, 3-phase 인트로, YouTube 임베드, 서브영상 모달.
 - 배포 인프라: GitHub Actions → GitHub Pages, 커스텀 도메인 `pure-blanche.com`(Cloudflare DNS).
 - **방명록 백엔드**: Cloudflare Workers + D1 (`api.pure-blanche.com`). 관리자 모드(`#/admin`),
@@ -14,6 +14,8 @@
 - **레거시 정리**: `lib/sections/`·`drive_video_player.dart` 삭제됨, `CLAUDE.md` 동기화, `docs/APPS.md` 신설.
 - **SMTM(정산표)** — `/settlement`. 균등분할 → 쌍별 상계 → 건별 입금 처리.
   로컬(localStorage) / 공유(D1 + 코드 링크) 2모드. 프로덕션 배포·검증 완료.
+- **강의 MP3 다운로더** — `/app/lecture-mp3`. Windows 프로그램의 소개·다운로드 페이지와
+  `/code` 카드(Windows App 배지, EXE 버튼). 설치 파일은 `Blanche-jara/lecture-mp3-release` Releases.
 
 ## 🔜 SMTM 다음 후보
 
@@ -38,6 +40,8 @@
 
 ## 🧹 알려진 부채
 
+- [ ] `/app/lecture-mp3` 방문 집계가 없다 — 백엔드 `/api/hit` 슬러그 화이트리스트에 `lecture-mp3`를
+      추가해 배포한 뒤 `main.dart` 라우트에 `trackId: 'lecture-mp3'`를 준다(순서를 바꾸면 400).
 - [ ] `test/widget_test.dart` 가 깨져 있다 — `main_page.dart`의 `dart:js_interop` 이
       VM 테스트에서 못 쓰여 컴파일 실패. 웹 전용 코드라 `flutter test` 대상에서 빼거나
       웹 테스트로 옮겨야 한다. (SMTM 테스트들은 정상 동작)

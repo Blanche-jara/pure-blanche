@@ -81,7 +81,7 @@ class _ProjectData {
   final List<String> techTags;
   final List<String> features;
   final IconData icon;
-  final String type; // "flutter" | "web"
+  final String type; // "flutter" | "web" | "windows"
   final String route;
   final String? downloadUrl;
   final String downloadLabel;
@@ -299,6 +299,25 @@ const _projects = [
     icon: Icons.receipt_long_outlined,
     type: 'flutter',
     route: '/settlement',
+  ),
+  _ProjectData(
+    title: '강의 MP3 다운로더',
+    subtitle: 'lecture-mp3',
+    description:
+        '온라인 강의를 MP3로 받고, 강의 화면을 캡처하고, 이 컴퓨터에서 받아쓴 뒤 '
+        'Claude로 교정·요약하는 Windows 프로그램. 크롬 확장으로 재생 중인 강의를 바로 보낸다.',
+    techTags: ['Python', 'PySide6', 'FFmpeg', 'Whisper', 'Claude Code'],
+    features: [
+      'm3u8 · mp4 → MP3, 크롬 확장 연동',
+      '슬라이드·코드 화면 자동 캡처 + 시간표',
+      'Whisper 받아쓰기 + Claude 교정·요약',
+      '설치할 때 필요한 기능만 골라 설치',
+    ],
+    icon: Icons.headphones_outlined,
+    type: 'windows',
+    route: '/app/lecture-mp3',
+    downloadUrl: 'https://github.com/Blanche-jara/lecture-mp3-release/releases/download/v1.0.0/LectureMP3-Setup-1.0.0.exe',
+    downloadLabel: 'EXE',
   ),
 ];
 
@@ -637,28 +656,26 @@ class _TypeBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isFlutter = type == 'flutter';
+    final (label, color, isWeb) = switch (type) {
+      'flutter' => ('Flutter App', AppColors.softPurple, false),
+      'windows' => ('Windows App', AppColors.infoTeal, false),
+      _ => ('Web', AppColors.signalGreen, true),
+    };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: isFlutter
-            ? AppColors.softPurple.withValues(alpha: 0.12)
-            : AppColors.signalGreen.withValues(alpha: 0.10),
-        border: Border.all(
-          color: isFlutter
-              ? AppColors.softPurple.withValues(alpha: 0.3)
-              : AppColors.signalGreen.withValues(alpha: 0.25),
-        ),
+        color: color.withValues(alpha: isWeb ? 0.10 : 0.12),
+        border: Border.all(color: color.withValues(alpha: isWeb ? 0.25 : 0.3)),
         borderRadius: BorderRadius.circular(9999),
       ),
       child: Text(
-        isFlutter ? 'Flutter App' : 'Web',
+        label,
         style: TextStyle(
           fontFamily: 'Inter',
           fontSize: 11,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.5,
-          color: isFlutter ? AppColors.softPurple : AppColors.mint,
+          color: isWeb ? AppColors.mint : color,
         ),
       ),
     );
