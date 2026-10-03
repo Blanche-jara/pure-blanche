@@ -106,6 +106,23 @@ class _ProjectData {
 
 const _projects = [
   _ProjectData(
+    title: 'SWORD +38',
+    subtitle: 'sword-upgrade',
+    description:
+        '깡깡깡, 검을 두드려 +38에 도전하는 픽셀 강화 게임. '
+        '일반 검 39종과 개성 있는 희귀 검 7종을 수집하고 대장간을 성장시키세요.',
+    techTags: ['Flutter', 'Dart', 'Pixel Art', 'Web Audio'],
+    features: [
+      '검 강화 / 판매 / 파괴 보호',
+      '보관함과 돌파 재료 / 시작 지점 구매',
+      '자동 강화와 희귀 검 발견 시 자동 정지',
+      '자동 저장 / 백업 코드 / 이미지 도움말',
+    ],
+    icon: Icons.gavel,
+    type: 'flutter',
+    route: '/app/sword-upgrade',
+  ),
+  _ProjectData(
     title: 'Jara Holdem Timer',
     subtitle: 'jara-holdem',
     description:

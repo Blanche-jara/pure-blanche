@@ -13,6 +13,7 @@ import 'apps/icm_split/icm_split_app.dart';
 import 'apps/safe_link/safe_link_app.dart';
 import 'apps/cannon/cannon_app.dart';
 import 'apps/settlement/settlement_app.dart';
+import 'apps/sword_upgrade/sword_upgrade_app.dart';
 
 void main() {
   runApp(const PureBlancheApp());
@@ -51,6 +52,12 @@ class PureBlancheApp extends StatelessWidget {
         // 숨김 관리자 진입점(#/admin). 비밀번호 통과 시 전체 글 수정/삭제.
         '/admin': (_) => const GuestbookPage(adminEntry: true),
         // Sub-apps
+        '/app/sword-upgrade': (_) => const SafeArea(
+              child: AppWrapper(
+                title: 'SWORD +38',
+                child: SwordUpgradeApp(),
+              ),
+            ),
         '/app/jara-holdem': (_) => const AppWrapper(
               title: 'Jara Holdem Timer',
               trackId: 'jara-holdem',

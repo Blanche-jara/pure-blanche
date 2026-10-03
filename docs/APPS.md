@@ -1,20 +1,21 @@
 # Pure Blanche — 코드 프로젝트 서브앱 레퍼런스
 
-> `/code`(`CodeProjectsPage`)에 카드로 노출되는 **12개 코드 프로젝트**의 상세 레퍼런스다.
+> `/code`(`CodeProjectsPage`)에 카드로 노출되는 **13개 코드 프로젝트**의 상세 레퍼런스다.
 > 출처: `lib/pages/code_projects_page.dart`(카드 데이터) + `lib/main.dart`(라우트) + 각 앱 디렉터리.
 > 라우팅·디자인 등 사이트 전체 구조는 [ARCHITECTURE.md](./ARCHITECTURE.md)(특히 3장 라우트, 6장 서브앱 요약) 참조.
 > 코드와 이 문서가 다르면 코드가 정답이며, 발견 즉시 고친다.
 
 ## 개요
 
-총 12개. 실행 방식은 두 가지다.
+총 13개. 실행 방식은 두 가지다.
 
-- **Flutter 인앱(7개)**: `lib/apps/<name>/`의 Dart 위젯을 `AppWrapper`(상단 뒤로가기 바)로 감싸 라우트에 직접 연결.
+- **Flutter 인앱(8개)**: `lib/apps/<name>/`의 Dart 위젯을 `AppWrapper`(상단 뒤로가기 바)로 감싸 라우트에 직접 연결.
 - **HTML/사전빌드 임베드(5개)**: `web/apps/<name>/`의 정적 산출물을 `HtmlAppPage`(`lib/apps/web_embed/html_app_page.dart`)가 `iframe`(HtmlElementView)으로 로드.
   이 중 강의 MP3 다운로더는 사이트에서 실행하는 앱이 아니라 Windows 프로그램의 소개·다운로드 페이지다.
 
 | 앱 | 라우트 | 타입 | 위치 | 한 줄 목적 | 외부 링크 |
 |----|--------|------|------|-----------|-----------|
+| SWORD +38 | `/app/sword-upgrade` | Flutter | `lib/apps/sword_upgrade/` | 픽셀 검 강화·수집 게임 | [플레이](https://pure-blanche.com/#/app/sword-upgrade) |
 | Jara Holdem Timer | `/app/jara-holdem` | Flutter | `lib/apps/jara_holdem/` | 포커 토너먼트 블라인드 타이머 & 매니저 | [APK](https://drive.google.com/file/d/1UsKiAJHPsZe6JUVeP9EOWsg511bBOVSg/view?usp=sharing) |
 | Who's the Nut? | `/app/whos-the-nut` | Flutter | `lib/apps/whos_the_nut/` | 너트 핸드 맞히기 + 사이드팟 분배 미니게임 | [APK](https://drive.google.com/file/d/1SliqndoB7B_Uoyxa52ZeaueQx3krhbeW/view?usp=sharing) · 정책/패치노트(`web/apps/whos-the-nut/`) |
 | ICM Split | `/app/icm-split` | Flutter | `lib/apps/icm_split/` | 토너먼트 딜(상금 분배)·버블 의사결정 ICM 계산기 | [APK](https://drive.google.com/file/d/149H-LL1Jxr-hk1EBSzu17rKF2QkpXpfk/view?usp=sharing) |
@@ -31,6 +32,17 @@
 ---
 
 ## Flutter 인앱
+
+### SWORD +38 — `/app/sword-upgrade`
+
+- **목적**: 일반 검 +0~38의 39종과 희귀 검 7종을 수집하는 픽셀 강화 게임.
+- **핵심 기능**: 강화·판매·비례 보호비(25/50/90%) / 보관·돌파 재료 / +10·20·30 시작점과 희귀 +0 시작 구매 / 희귀 발견 확률 최대 5% / 자동 강화(희귀 발견 시 정지) / 장인의 기운 / 이미지 도움말 7장.
+- **저장**: `shared_preferences`의 `sword_upgrade.save.v1` 키. 현재 브라우저·도메인에서 자동 저장, SU1 백업 코드로 이동. localhost 진행은 설정에서 백업 코드를 내보낸 뒤 배포 사이트로 가져온다. 서버 저장·계정 동기화 없음.
+- **구조**: `sword_upgrade_app.dart`(진입·픽셀 테마), `engine/`(규칙·밸런스), `state/game_controller.dart`, `data/save_repository.dart`, `audio/`(Web Audio), `ui/`(대장간·팝업·도움말). 중첩 MaterialApp 없이 SafeArea → AppWrapper 안에 연결한다.
+- **리소스**: `assets/sword_upgrade/`의 게임 이미지 110개·도움말 PNG 7개·효과음 WAV 5개, `assets/fonts/neodgm.ttf`(OFL 포함). 별도 폰트와 게임 팔레트는 모듈 안에서만 적용한다.
+- **테스트**: `flutter test test/sword_upgrade`; 허브 상단바와 안전 영역을 포함한 320~430px 세로·844×390 가로 화면에서 강화와 상점·도감·기록·설정·도움말을 검사한다. 치트 백업은 `test/sword_upgrade/fixtures/`에 있으며 런타임 번들에 포함하지 않는다.
+- **접속 통계**: 백엔드 `/api/hit` 허용 목록에 없어 `trackId`를 지정하지 않는다.
+
 
 ### Jara Holdem Timer — `/app/jara-holdem`
 

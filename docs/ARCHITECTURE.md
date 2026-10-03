@@ -20,22 +20,23 @@ Flutter Web 단일 페이지 앱(SPA)으로 만든 **Blanche의 개인 포트폴
 | 로컬 Flutter | 3.38.7 stable (개발 머신 기준 — 참고용, CI는 stable 채널 최신) |
 | 상태관리 | Provider(jara-holdem), Riverpod+Hive(icm-split), setState(나머지) |
 | 저장소 | SharedPreferences / 브라우저 localStorage (사용자별 독립), 서버 DB 없음 |
-| 폰트 | Google Fonts(Inter), system-ui(Segoe UI 헤딩), Consolas(코드) |
+| 폰트 | Google Fonts(Inter), system-ui(Segoe UI 헤딩), Consolas(코드), NeoDunggeunmo(SWORD +38) |
 | 배포 | GitHub Pages + GitHub Actions (`.github/workflows/deploy.yml`) |
 
 **주요 의존성** (`pubspec.yaml`): `provider`, `audioplayers`, `shared_preferences`, `intl`, `web`, `url_launcher`, `pointer_interceptor`, `google_fonts`, `flutter_riverpod`, `hive`/`hive_flutter`, `fl_chart`, `uuid`.
 
 ## 3. 라우팅 (`lib/main.dart`)
 
-`MaterialApp.routes`로 정의된 17개 named route. `debugShowCheckedModeBanner: false`, `theme: AppTheme.dark`, `initialRoute: '/'`.
+`MaterialApp.routes`로 정의된 18개 named route. `debugShowCheckedModeBanner: false`, `theme: AppTheme.dark`, `initialRoute: '/'`.
 
 | Path | 위젯 | 설명 |
 |------|------|------|
 | `/` | `MainPage` | 2-page 세로 스냅: 히어로 + 3 네비카드. 첫 방문 시 인트로 영상 |
-| `/code` | `CodeProjectsPage` | 코드 프로젝트 12개 카드 |
+| `/code` | `CodeProjectsPage` | 코드 프로젝트 13개 카드 |
 | `/video` | `VideoProjectsPage` | 영상 연대표 (7개 시대 풀페이지 스냅) |
 | `/guestbook` | `GuestbookPage` | 방명록 (Cloudflare Workers+D1 연동) |
 | `/admin` | `GuestbookPage(adminEntry:true)` | 숨김 관리자 진입 (비밀번호 → 방명록 관리/접속 통계 탭) |
+| `/app/sword-upgrade` | `SafeArea` + `AppWrapper` + `SwordUpgradeApp` | SWORD +38 — 픽셀 검 강화 게임 (Flutter) |
 | `/app/jara-holdem` | `AppWrapper`+`JaraHoldemApp` | 포커 토너먼트 타이머 (Flutter) |
 | `/app/roulette` | `AppWrapper`+`RouletteAppEntry` | 자마카세 인원뽑기 룰렛 (Flutter) |
 | `/app/whos-the-nut` | `AppWrapper`+`WhosTheNutApp` | 너트 핸드 평가기 (Flutter) |
@@ -65,7 +66,7 @@ pure-blanche/
 │   ├── main.dart              # 엔트리 + 라우팅
 │   ├── theme/                 # app_colors.dart, app_theme.dart
 │   ├── pages/                 # main / code_projects / video_projects / guestbook
-│   ├── apps/                  # 서브앱 6개(Flutter) + app_wrapper + web_embed
+│   ├── apps/                  # 서브앱 8개(Flutter) + app_wrapper + web_embed
 │   ├── widgets/               # nav_bar, page_scaffold, section_header, youtube_player ...
 │   └── services/              # guestbook_service.dart, stats_service.dart
 ├── backend/                   # Cloudflare Worker + D1 (방명록 + 접속통계/WG정답 + 정산표 API)
@@ -85,7 +86,7 @@ pure-blanche/
 - 반응형 기준 768px.
 
 ### 5.2 CodeProjectsPage (`lib/pages/code_projects_page.dart`)
-- Wrap 그리드(데스크톱 2열 / 모바일 1열, 기준 600px), 카드 12개.
+- Wrap 그리드(데스크톱 2열 / 모바일 1열, 기준 600px), 카드 13개.
 - 카드: 아이콘+타입배지(Flutter App / Web / Windows App), 제목, 폴더명(Consolas), 설명, 기능 4줄, 기술 태그, (선택)다운로드 버튼/정책·패치노트 링크.
 - 클릭 → `Navigator.pushNamed(route)`. 호버 시 border→signalGreen + 글로우.
 - 앱별 상세는 [APPS.md](./APPS.md) 참조.
@@ -128,6 +129,7 @@ pure-blanche/
 | `roulette/` | 자마카세 인원뽑기 | 참가자 룰렛 스피너 |
 | `safe_link/` | It's Safe Link | lz-string 압축+hash, 도착지 미리보기 리다이렉트 |
 | `cannon/` | THE CANNON | 주사위 텀블 애니메이션 추첨, CustomPainter |
+| `sword_upgrade/` | SWORD +38 | 39종 일반 검·7종 희귀 검, Web Audio, 자동 저장·백업·도움말 |
 | `settlement/` | SMTM (정산표) | 지출 균등분할 → 쌍별 상계 → 건별 입금 처리. 로컬/서버 공유 2모드 |
 | `web_embed/` | (래퍼) | `html_app_page.dart` — HTML/사전빌드 앱 iframe 임베드 |
 | `app_wrapper.dart` | (래퍼) | 모든 Flutter 서브앱 공통 뒤로가기 바 |
@@ -136,7 +138,7 @@ pure-blanche/
 
 ## 7. 디자인 시스템
 
-색상은 반드시 `AppColors`(`lib/theme/app_colors.dart`) 상수 사용. 하드코딩 금지.
+색상은 반드시 `AppColors`(`lib/theme/app_colors.dart`) 상수 사용. 하드코딩 금지. 기존 SWORD +38의 픽셀 팔레트와 NeoDunggeunmo 폰트는 게임 모듈의 독립 Theme 안에서 유지한다.
 
 | 역할 | 상수 | Hex |
 |------|------|-----|

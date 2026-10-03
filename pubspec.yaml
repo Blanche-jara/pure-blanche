@@ -90,6 +90,22 @@ flutter:
 
   assets:
     - assets/Blanche_Logo.png
+    - assets/sword_upgrade/weapons/normal/
+    - assets/sword_upgrade/weapons/rare/
+    - assets/sword_upgrade/thumbnails/normal/
+    - assets/sword_upgrade/thumbnails/rare/
+    - assets/sword_upgrade/scene/
+    - assets/sword_upgrade/ui/
+    - assets/sword_upgrade/fx/
+    - assets/sword_upgrade/audio/
+    - assets/sword_upgrade/ending/
+    - assets/sword_upgrade/guide/
+    - assets/fonts/OFL.txt
+
+  fonts:
+    - family: NeoDunggeunmo
+      fonts:
+        - asset: assets/fonts/neodgm.ttf
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
