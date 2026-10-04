@@ -42,7 +42,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
       message = '보유 보호권을 골드로 환급했습니다. 보호비는 강화할 때 결제합니다.';
     }
     if (this.state.checkpointMigrated) {
-      message = '구매한 시작점을 +11·21·31로 무료 승계했습니다. 현재 검은 그대로 유지됩니다.';
+      message = '시작점은 +10·20·30, 첫 돌파 재료는 면제됩니다. 기존 골드와 검은 유지됩니다.';
     }
     _syncMusic();
     WidgetsBinding.instance.addObserver(this);

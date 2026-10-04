@@ -73,7 +73,7 @@ class Sword {
             (rareId == null
                 ? ![
                     ...Checkpoints.normalLevels,
-                    ...Checkpoints.legacyNormalLevels,
+                    ...Checkpoints.schema4NormalLevels,
                   ].any(
                     (n) => n <= level && Balance.salePrices[n] == starterValue,
                   )
@@ -92,7 +92,7 @@ class Sword {
 }
 
 class GameState {
-  static const schemaVersion = 4;
+  static const schemaVersion = 5;
   int loadedSchemaVersion = schemaVersion;
   bool checkpointMigrated = false;
   double gold = Balance.startGold;
@@ -233,12 +233,12 @@ class GameState {
       state.unlockedStartLevel = checkedInt(
         j['unlockedStartLevel'],
         0,
-        schemaVersion < 4 ? 30 : 31,
+        schemaVersion == 4 ? 31 : 30,
       );
       state.startLevel = checkedInt(
         j['startLevel'],
         0,
-        schemaVersion < 4 ? 30 : 31,
+        schemaVersion == 4 ? 31 : 30,
       );
       final starts = j['rareStarts'];
       if (starts is! List ||
@@ -250,24 +250,31 @@ class GameState {
       }
       state.rareStarts = starts.cast<String>().toList();
       state.startRareId = j['startRareId'] as String?;
-      final levels = schemaVersion < 4
-          ? [0, ...Checkpoints.legacyNormalLevels]
+      final levels = schemaVersion == 4
+          ? [0, ...Checkpoints.schema4NormalLevels]
           : [0, ...Checkpoints.normalLevels];
       if (!levels.contains(state.unlockedStartLevel) ||
           !levels.contains(state.startLevel) ||
           state.startLevel > state.unlockedStartLevel ||
           state.unlockedStartLevel >
-              state.bestLevel + (schemaVersion < 4 ? 0 : 1)) {
+              state.bestLevel + (schemaVersion == 4 ? 1 : 0)) {
         throw const FormatException('구매하지 않은 시작점입니다.');
       }
-      if (schemaVersion < 4) {
+      if (schemaVersion < GameState.schemaVersion) {
         state.checkpointMigrated = state.unlockedStartLevel > 0;
+      }
+      if (schemaVersion == 4) {
         state.unlockedStartLevel = Checkpoints.migrateLevel(
           state.unlockedStartLevel,
         );
         state.startLevel = Checkpoints.migrateLevel(state.startLevel);
       }
     }
+    // Keep unused +11/+21/+31 swords already granted by schema 4, including
+    // their sale basis and a best record one level below that free starter.
+    final maximumStarterValue = state.unlockedStartLevel == 0
+        ? 0.0
+        : Balance.salePrices[state.unlockedStartLevel + 1];
     final found = checkedMap(j['discovered']);
     for (final entry in found.entries) {
       if (!rareWeapons.any((weapon) => weapon.id == entry.key)) {
@@ -300,7 +307,11 @@ class GameState {
     if (swords.any(
           (s) =>
               !s.isRare &&
-              s.level > max(state.bestLevel, state.unlockedStartLevel),
+              s.level > max(state.bestLevel, state.unlockedStartLevel) &&
+              !(Checkpoints.schema4NormalLevels.contains(s.level) &&
+                  !s.canStore &&
+                  s.level <= state.unlockedStartLevel + 1 &&
+                  s.level <= state.bestLevel + 1),
         ) ||
         swords.any(
           (s) =>
@@ -317,8 +328,7 @@ class GameState {
               s.starterValue > 0 &&
               (s.isRare
                   ? !state.rareStarts.contains(s.rareId)
-                  : s.starterValue >
-                        Balance.salePrices[state.unlockedStartLevel]),
+                  : s.starterValue > maximumStarterValue),
         ) ||
         state.storage.whereType<Sword>().any((s) => !s.canStore)) {
       throw const FormatException('저장 데이터의 기록이 일치하지 않습니다.');

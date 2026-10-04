@@ -180,7 +180,7 @@ class _ForgeScreenState extends State<ForgeScreen> {
     if (state.confirmHigh && state.autoTarget > 20 && state.protection == 0) {
       if (!await _confirm(
         '자동 강화 시작',
-        '목표 +${state.autoTarget}까지 보호 없이 강화합니다.\n검이 파괴돼도 새 검으로 계속합니다.\n돌파·희귀 발견·골드 부족 시 정지합니다.',
+        '목표 +${state.autoTarget}까지 보호 없이 강화합니다.\n검이 파괴돼도 새 검으로 계속합니다.\n재료가 필요한 돌파·희귀 발견·골드 부족 시 정지합니다.',
         action: '시작',
       )) {
         return;
@@ -578,6 +578,8 @@ class _ForgeScreenState extends State<ForgeScreen> {
           ? '단조 중...'
           : maximum
           ? '최고 단계 완성'
+          : game.rules.startMaterialsExempt
+          ? '돌파하기 · 재료 면제'
           : game.rules.gate != null
           ? '돌파하기'
           : '강화하기',
@@ -633,6 +635,14 @@ class _ForgeScreenState extends State<ForgeScreen> {
             Text(
               '새 검 시작점 · ${game.rules.startName}',
               style: const TextStyle(color: Ink.gold, fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (game.rules.startMaterialsExempt) ...[
+            const Text(
+              '시작 검 첫 돌파 · 재료 면제\n성공률·강화비·파괴 위험은 그대로',
+              key: ValueKey('start-material-exemption'),
+              style: TextStyle(color: Ink.gold, fontSize: 12, height: 1.5),
             ),
             const SizedBox(height: 12),
           ],
@@ -784,7 +794,12 @@ class _ForgeScreenState extends State<ForgeScreen> {
     final next = state.sword.isRare
         ? null
         : Balance.gates.entries
-              .where((entry) => entry.key >= state.sword.level)
+              .where(
+                (entry) =>
+                    entry.key >= state.sword.level &&
+                    !(entry.key == state.sword.level &&
+                        game.rules.startMaterialsExempt),
+              )
               .firstOrNull;
     final ready = next == null
         ? 0

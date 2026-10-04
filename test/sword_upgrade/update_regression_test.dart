@@ -29,14 +29,16 @@ class MusicProbe extends ForgeAudio {
   void stop() => playing = false;
 }
 
-String oldCode(int start) => File(
-  'test/sword_upgrade/fixtures/live_v3_start_$start.txt',
+String oldCode(int start, {int version = 3}) => File(
+  'test/sword_upgrade/fixtures/live_v${version}_start_$start.txt',
 ).readAsStringSync();
-Map<String, dynamic> oldJson(int start) =>
+Map<String, dynamic> oldJson(int start, {int version = 3}) =>
     jsonDecode(
           (jsonDecode(
                     utf8.decode(
-                      base64Url.decode(oldCode(start).trim().substring(4)),
+                      base64Url.decode(
+                        oldCode(start, version: version).trim().substring(4),
+                      ),
                     ),
                   )
                   as Map<String, dynamic>)['payload']
@@ -46,24 +48,28 @@ Map<String, dynamic> oldJson(int start) =>
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  for (final version in [2, 3]) {
+  for (final version in [2, 3, 4]) {
     for (final start in [10, 20, 30]) {
       test(
         'schema $version +$start purchase migrates without altering progress',
         () {
-          final original = oldJson(start)..['schemaVersion'] = version;
-          final state = version == 3
+          final original = version == 4
+              ? oldJson(start + 1, version: 4)
+              : (oldJson(start)..['schemaVersion'] = version);
+          final state = version == 4
+              ? SaveRepository.decode(oldCode(start + 1, version: 4))
+              : version == 3
               ? SaveRepository.decode(oldCode(start))
               : GameState.fromJson(original);
           final expected = Map<String, dynamic>.of(original)
-            ..['schemaVersion'] = 4
-            ..['startLevel'] = start + 1
-            ..['unlockedStartLevel'] = start + 1
+            ..['schemaVersion'] = 5
+            ..['startLevel'] = start
+            ..['unlockedStartLevel'] = start
             ..['musicEnabled'] = false
             ..['audioMuted'] = false;
           expect(state.toJson(), expected);
           expect(state.bestLevel, start);
-          expect(state.sword.level, start);
+          expect(state.sword.toJson(), original['sword']);
           expect(state.storage[0]!.locked, isTrue);
           expect(state.storage[1]!.hearts, 2);
           expect(
@@ -72,14 +78,15 @@ void main() {
           );
           final rules = GameRules(state);
           expect(
-            Checkpoints.normalPrice(start + 1),
+            Checkpoints.normalPrice(start),
             Balance.salePrices[start] * 100,
           );
           // An old, unused starter is replaced only when the player chooses it.
-          rules.selectStart(level: start + 1);
-          expect(state.sword.level, start + 1);
+          rules.selectStart(level: start);
+          expect(state.sword.level, start);
           expect(state.bestLevel, start);
           expect(rules.gate, isNull);
+          expect(rules.startMaterialsExempt, isTrue);
           expect(state.sword.canSell, isFalse);
           expect(state.sword.canStore, isFalse);
           expect(
@@ -103,7 +110,7 @@ void main() {
     final state = GameState.fromJson(original);
     expect(state.sword.toJson(), original['sword']);
     expect(state.storage[0]!.toJson(), original['storage'][0]);
-    GameRules(state).selectStart(level: 31);
+    GameRules(state).selectStart(level: 30);
     expect(state.sword.level, 30);
     expect(state.sword.starterValue, Balance.salePrices[20]);
   });
@@ -135,7 +142,7 @@ void main() {
       expect(prefs.getString(SaveRepository.preUpgradeKey), raw);
       expect(prefs.getString(SaveRepository.key), raw);
       await game.saveNow();
-      expect(game.repository.load()!.startLevel, 11);
+      expect(game.repository.load()!.startLevel, 10);
       expect(game.repository.load()!.gold, 9876543210);
       game.dispose();
       final reopened = await GameController.load(SaveRepository(prefs));
@@ -143,6 +150,58 @@ void main() {
       expect(prefs.getString(SaveRepository.preUpgradeKey), raw);
       expect(reopened.state.checkpointMigrated, isFalse);
       reopened.dispose();
+    },
+  );
+  test(
+    'schema 4 is preferred and copied intact before saving; older tabs cannot overwrite schema 5',
+    () async {
+      final raw = oldCode(21, version: 4);
+      SharedPreferences.setMockInitialValues({
+        SaveRepository.previousKey: raw,
+        SaveRepository.key: oldCode(10),
+      });
+      final prefs = await SharedPreferences.getInstance();
+      final game = await GameController.load(SaveRepository(prefs));
+      expect(game.state.startLevel, 20);
+      expect(game.state.sword.level, 21);
+      expect(game.state.bestLevel, 20);
+      expect(game.state.sword.starterValue, Balance.salePrices[21]);
+      expect(prefs.getString(SaveRepository.preUpgradeKey), raw);
+      game.state.gold = 4444;
+      await game.saveNow();
+      expect(prefs.getString(SaveRepository.previousKey), raw);
+      await prefs.setString(
+        SaveRepository.previousKey,
+        oldCode(11, version: 4),
+      );
+      await prefs.setString(SaveRepository.key, oldCode(30));
+      expect(game.repository.load()!.gold, 4444);
+      expect(game.repository.load()!.startLevel, 20);
+      expect(game.repository.load()!.sword.level, 21);
+      expect(prefs.getString(SaveRepository.preUpgradeKey), raw);
+      game.dispose();
+    },
+  );
+  test(
+    'enhanced schema-4 swords keep their higher basis and exact sale value',
+    () {
+      final original = oldJson(21, version: 4);
+      (original['sword'] as Map<String, dynamic>)['level'] = 22;
+      original['bestLevel'] = 22;
+      original['storage'][0] = Map<String, dynamic>.of(original['sword']);
+      final state = GameState.fromJson(original);
+      expect(state.sword.toJson(), original['sword']);
+      expect(state.storage[0]!.toJson(), original['storage'][0]);
+      expect(state.gold, original['gold']);
+      expect(state.bestLevel, 22);
+      expect(
+        GameRules(state).saleNet(state.sword),
+        (Balance.salePrices[22] - Balance.salePrices[21]) * .9,
+      );
+      expect(
+        SaveRepository.decode(SaveRepository.encode(state)).toJson(),
+        state.toJson(),
+      );
     },
   );
   test(
@@ -163,6 +222,26 @@ void main() {
       );
     },
   );
+  test('a damaged newer save never rolls back to a stale older save', () async {
+    SharedPreferences.setMockInitialValues({
+      SaveRepository.previousKey: 'broken schema-4 original',
+      SaveRepository.key: oldCode(10),
+    });
+    final prefs = await SharedPreferences.getInstance();
+    await expectLater(
+      GameController.load(SaveRepository(prefs)),
+      throwsFormatException,
+    );
+    expect(
+      prefs.getString(SaveRepository.previousKey),
+      'broken schema-4 original',
+    );
+    expect(
+      prefs.getString('${SaveRepository.previousKey}.recovery'),
+      'broken schema-4 original',
+    );
+    expect(prefs.getString(SaveRepository.currentKey), isNull);
+  });
   test(
     'an old tab cannot overwrite the updated progress or read a new schema',
     () async {
@@ -175,12 +254,9 @@ void main() {
       expect(prefs.getString(SaveRepository.key), raw);
       expect(prefs.getString(SaveRepository.currentKey), isNotNull);
       // Simulate a still-running old client writing a shipped schema-3 code.
-      await prefs.setString(
-        SaveRepository.key,
-        oldCode(10),
-      );
+      await prefs.setString(SaveRepository.key, oldCode(10));
       expect(repository.load()!.gold, 4444);
-      expect(repository.load()!.startLevel, 21);
+      expect(repository.load()!.startLevel, 20);
       await repository.save(GameState());
       expect(repository.load()!.gold, 500);
       expect(repository.load()!.startLevel, 0);

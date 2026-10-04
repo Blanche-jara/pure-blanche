@@ -4,20 +4,21 @@ import '../engine/models.dart';
 
 class SaveRepository {
   static const key = 'sword_upgrade.save.v1';
-  // Old open tabs keep writing v1. Never expose schema 4 to the old reader.
-  static const currentKey = 'sword_upgrade.save.v4';
-  static const preUpgradeKey = '$key.beforeSchema4';
+  // Older clients keep writing v1/v4. Preserve them and write only schema 5.
+  static const previousKey = 'sword_upgrade.save.v4';
+  static const currentKey = 'sword_upgrade.save.v5';
+  static const preUpgradeKey = 'sword_upgrade.save.beforeSchema5';
   final SharedPreferences preferences;
   Future<void> _writes = Future.value();
   SaveRepository(this.preferences);
   GameState? load() {
-    final raw = preferences.getString(currentKey) ?? preferences.getString(key);
+    final raw = preferences.getString(_sourceKey);
     if (raw == null) return null;
     return decode(raw);
   }
 
   Future<void> preserveInvalidSave() async {
-    final sourceKey = preferences.containsKey(currentKey) ? currentKey : key;
+    final sourceKey = _sourceKey;
     final raw = preferences.getString(sourceKey);
     if (raw != null) await preferences.setString('$sourceKey.recovery', raw);
   }
@@ -28,11 +29,17 @@ class SaveRepository {
         preferences.containsKey(preUpgradeKey)) {
       return;
     }
-    final raw = preferences.getString(key);
+    final raw = preferences.getString(_sourceKey);
     if (raw != null && !await preferences.setString(preUpgradeKey, raw)) {
       throw StateError('업데이트 전 저장의 복구 사본을 보존하지 못했습니다.');
     }
   }
+
+  String get _sourceKey => preferences.containsKey(currentKey)
+      ? currentKey
+      : preferences.containsKey(previousKey)
+      ? previousKey
+      : key;
 
   Future<void> save(GameState state) {
     final code = encode(state);

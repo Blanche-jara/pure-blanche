@@ -171,27 +171,50 @@ void main() {
     expect(game.autoRunning, isFalse);
     game.dispose();
   });
-  testWidgets('buying a checkpoint keeps an enhanced sword and its remaining gate', (
-    tester,
-  ) async {
-    final state = GameState()
-      ..gold = 1e20
-      ..bestLevel = 11
-      ..sword = const Sword(level: 9)
-      ..autoTarget = 12;
-    final game = await make(state, roll: () => 0);
-    game.rules.buyNormalStart(11);
-    final running = game.startAuto();
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.pump(const Duration(milliseconds: 1200));
-    // The +10 gate still stops a run that started below the purchased checkpoint.
-    await running;
-    expect(state.sword.level, 10);
-    expect(state.attempts, 1);
-    expect(game.message, contains('돌파'));
-    expect(game.autoRunning, isFalse);
-    game.dispose();
-  });
+  testWidgets(
+    'auto passes the purchased starter gate and stops at the next material gate',
+    (tester) async {
+      final game = await make(
+        GameState()
+          ..gold = 1e10
+          ..bestLevel = 10,
+      );
+      game.rules.buyNormalStart(10);
+      game.setAutoTarget(15);
+      final run = game.startAuto();
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 300));
+      }
+      await run;
+      expect(game.state.sword.level, 15);
+      expect(game.state.attempts, 5);
+      expect(game.autoRunning, isFalse);
+      expect(game.rules.gate, isNotNull);
+      game.dispose();
+    },
+  );
+  testWidgets(
+    'buying a checkpoint keeps an enhanced sword and its remaining gate',
+    (tester) async {
+      final state = GameState()
+        ..gold = 1e20
+        ..bestLevel = 10
+        ..sword = const Sword(level: 9)
+        ..autoTarget = 12;
+      final game = await make(state, roll: () => 0);
+      game.rules.buyNormalStart(10);
+      final running = game.startAuto();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 1200));
+      // The +10 gate still stops a run that started below the purchased checkpoint.
+      await running;
+      expect(state.sword.level, 10);
+      expect(state.attempts, 1);
+      expect(game.message, contains('돌파'));
+      expect(game.autoRunning, isFalse);
+      game.dispose();
+    },
+  );
   testWidgets(
     'auto stops when the selected rare starter replaces a normal sword',
     (tester) async {

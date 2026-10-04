@@ -67,8 +67,17 @@ class GameRules {
           rareBase: Checkpoints.rareBase,
           starterValue: Checkpoints.rareBase,
         );
-  Gate? get gate =>
-      state.sword.isRare ? null : Balance.gates[state.sword.level];
+  bool get startMaterialsExempt {
+    final sword = state.sword;
+    return !sword.isRare &&
+        Checkpoints.normalLevels.contains(sword.level) &&
+        sword.level <= state.unlockedStartLevel &&
+        sword.starterValue == Balance.salePrices[sword.level];
+  }
+
+  Gate? get gate => state.sword.isRare || startMaterialsExempt
+      ? null
+      : Balance.gates[state.sword.level];
   List<int> materialCandidates({bool includeLocked = false}) {
     final need = gate;
     if (need == null) return [];
