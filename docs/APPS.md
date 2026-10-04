@@ -36,11 +36,12 @@
 ### SWORD +38 — `/app/sword-upgrade`
 
 - **목적**: 일반 검 +0~38의 39종과 희귀 검 7종을 수집하는 픽셀 강화 게임.
-- **핵심 기능**: 강화·판매·비례 보호비(25/50/90%) / 보관·돌파 재료 / +10·20·30 시작점과 희귀 +0 시작 구매 / 희귀 발견 확률 최대 5% / 자동 강화(희귀 발견 시 정지) / 장인의 기운 / 이미지 도움말 7장.
-- **저장**: `shared_preferences`의 `sword_upgrade.save.v1` 키. 현재 브라우저·도메인에서 자동 저장, SU1 백업 코드로 이동. localhost 진행은 설정에서 백업 코드를 내보낸 뒤 배포 사이트로 가져온다. 서버 저장·계정 동기화 없음.
-- **구조**: `sword_upgrade_app.dart`(진입·픽셀 테마), `engine/`(규칙·밸런스), `state/game_controller.dart`, `data/save_repository.dart`, `audio/`(Web Audio), `ui/`(대장간·팝업·도움말). 중첩 MaterialApp 없이 SafeArea → AppWrapper 안에 연결한다.
-- **리소스**: `assets/sword_upgrade/`의 게임 이미지 110개·도움말 PNG 7개·효과음 WAV 5개, `assets/fonts/neodgm.ttf`(OFL 포함). 별도 폰트와 게임 팔레트는 모듈 안에서만 적용한다.
+- **핵심 기능**: 강화·판매·비례 보호비(25/50/90%) / 보관·돌파 재료 / +11·21·31 시작점과 희귀 +0 시작 구매 / 희귀 발견 확률 최대 5% / 자동 강화(희귀 발견 시 정지) / 장인의 기운 / 이미지 도움말 7장.
+- **저장**: `shared_preferences`의 `sword_upgrade.save.v4` 키. 기존 `sword_upgrade.save.v1`을 읽어 자동 승계하고 원본·변환 전 복구 사본을 유지한다. schema 1~3, 기존 SU1 코드 지원. 구버전 탭은 v1 키만 써서 새 진행을 덮어쓰지 못한다. 현재 브라우저·도메인에서 자동 저장, SU1 백업 코드로 이동. localhost 진행은 설정에서 백업 코드를 내보낸 뒤 배포 사이트로 가져온다. 서버 저장·계정 동기화 없음.
+- **구조**: `sword_upgrade_app.dart`(진입·픽셀 테마), `engine/`(규칙·밸런스), `state/game_controller.dart`, `data/save_repository.dart`, `audio/`(효과음 Web Audio + BGM HTMLAudioElement), `ui/`(대장간·팝업·도움말). 중첩 MaterialApp 없이 SafeArea → AppWrapper 안에 연결한다.
+- **리소스**: `assets/sword_upgrade/`의 게임 이미지 110개·도움말 PNG 7개·효과음 WAV 5개·BGM MP3 1개, `assets/fonts/neodgm.ttf`(OFL 포함). 별도 폰트와 게임 팔레트는 모듈 안에서만 적용한다.
 - **테스트**: `flutter test test/sword_upgrade`; 허브 상단바와 안전 영역을 포함한 320~430px 세로·844×390 가로 화면에서 강화와 상점·도감·기록·설정·도움말을 검사한다. 치트 백업은 `test/sword_upgrade/fixtures/`에 있으며 런타임 번들에 포함하지 않는다.
+- **0.5.0 승계**: +10·20·30 구매·선택은 +11·21·31로 무료 변경, 모루·보관 검/골드/최고 기록은 유지. 시작점 가격과 희귀 기본 가치 그대로. 새 구매는 +11·21·31 도달 후 가능. 전체 음소거 버튼과 음악/효과음 개별 설정은 저장하며 이전 음소거 설정을 존중한다. 읽기 실패 시 초기화·덮어쓰기 없이 중단. `update_regression_test.dart`는 이전 저장과 구버전 탭의 쓰기로 인한 손상 방지를 검증한다. 음악은 자동 재생 시도 후 정책에 막히면 첫 터치/클릭/키에서 재생한다.
 - **접속 통계**: 백엔드 `/api/hit` 허용 목록에 없어 `trackId`를 지정하지 않는다.
 
 

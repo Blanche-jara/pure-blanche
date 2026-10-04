@@ -55,7 +55,14 @@ class _SwordUpgradeAppState extends State<SwordUpgradeApp> {
         if (snapshot.hasError) {
           return const Scaffold(
             backgroundColor: design.Ink.background,
-            body: Center(child: Text('브라우저 저장소를 열지 못했습니다. 새로고침해주세요.')),
+            body: Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  '저장을 불러오지 못했습니다. 기존 진행을 초기화하거나 덮어쓰지 않았습니다. 새로고침한 뒤에도 계속되면 저장 복구가 필요합니다.',
+                ),
+              ),
+            ),
           );
         }
         if (!snapshot.hasData) {

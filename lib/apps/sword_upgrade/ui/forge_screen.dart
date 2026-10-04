@@ -58,6 +58,7 @@ class _ForgeScreenState extends State<ForgeScreen> {
 
   Future<T?> _modal<T>(Widget Function(BuildContext) builder) async {
     if (_dialogOpen || (game.busy && !game.autoRunning)) return null;
+    game.unlockAudio();
     _dialogOpen = true;
     try {
       game.stopAuto(silent: true);
@@ -252,6 +253,7 @@ class _ForgeScreenState extends State<ForgeScreen> {
   }
 
   KeyEventResult _key(FocusNode node, KeyEvent event) {
+    if (event is KeyDownEvent) game.unlockAudio();
     if (_dialogOpen || event is! KeyDownEvent) return KeyEventResult.ignored;
     switch (event.logicalKey) {
       case LogicalKeyboardKey.space:
@@ -279,85 +281,91 @@ class _ForgeScreenState extends State<ForgeScreen> {
     focusNode: _focus,
     autofocus: true,
     onKeyEvent: _key,
-    child: AnimatedBuilder(
-      animation: game,
-      builder: (context, _) => Scaffold(
-        backgroundColor: widget.backgroundColor ?? Ink.background,
-        body: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final desktop = constraints.maxWidth >= 1000;
-              return SingleChildScrollView(
-                padding: EdgeInsets.symmetric(
-                  horizontal: constraints.maxWidth < 400 ? 12 : 24,
-                  vertical: 24,
-                ),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1120),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _header(desktop),
-                        const SizedBox(height: 20),
-                        if (game.saveError != null) ...[
-                          PixelPanel(
-                            child: Text(
-                              game.saveError!,
-                              style: const TextStyle(
-                                color: Ink.red,
-                                height: 1.5,
+    child: Listener(
+      onPointerDown: (_) => game.unlockAudio(),
+      child: AnimatedBuilder(
+        animation: game,
+        builder: (context, _) => Scaffold(
+          backgroundColor: widget.backgroundColor ?? Ink.background,
+          body: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final desktop = constraints.maxWidth >= 1000;
+                return SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: constraints.maxWidth < 400 ? 12 : 24,
+                    vertical: 24,
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1120),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _header(desktop),
+                          const SizedBox(height: 20),
+                          if (game.saveError != null) ...[
+                            PixelPanel(
+                              child: Text(
+                                game.saveError!,
+                                style: const TextStyle(
+                                  color: Ink.red,
+                                  height: 1.5,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                        if (desktop)
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(child: _forge()),
-                              const SizedBox(width: 20),
-                              SizedBox(width: 340, child: _controls()),
-                            ],
-                          )
-                        else ...[
-                          _forge(),
-                          const SizedBox(height: 16),
-                          _controls(compact: true),
-                        ],
-                        const SizedBox(height: 20),
-                        _storage(),
-                        const SizedBox(height: 16),
-                        Wrap(
-                          alignment: WrapAlignment.spaceBetween,
-                          spacing: 12,
-                          runSpacing: 8,
-                          children: [
-                            const Text(
-                              'SPACE 강화  /  S 판매  /  D 보관  /  1~4 보호',
-                              style: TextStyle(color: Ink.muted, fontSize: 12),
-                            ),
-                            Text(
-                              game.saveError != null
-                                  ? '저장 확인 필요'
-                                  : game.lastSaved != null
-                                  ? '자동 저장됨'
-                                  : '진행은 이 브라우저에 저장됩니다',
-                              style: const TextStyle(
-                                color: Ink.muted,
-                                fontSize: 12,
-                              ),
-                            ),
+                            const SizedBox(height: 12),
                           ],
-                        ),
-                        const SizedBox(height: 16),
-                      ],
+                          if (desktop)
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(child: _forge()),
+                                const SizedBox(width: 20),
+                                SizedBox(width: 340, child: _controls()),
+                              ],
+                            )
+                          else ...[
+                            _forge(),
+                            const SizedBox(height: 16),
+                            _controls(compact: true),
+                          ],
+                          const SizedBox(height: 20),
+                          _storage(),
+                          const SizedBox(height: 16),
+                          Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            spacing: 12,
+                            runSpacing: 8,
+                            children: [
+                              const Text(
+                                'SPACE 강화  /  S 판매  /  D 보관  /  1~4 보호',
+                                style: TextStyle(
+                                  color: Ink.muted,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              Text(
+                                game.saveError != null
+                                    ? '저장 확인 필요'
+                                    : game.lastSaved != null
+                                    ? '자동 저장됨'
+                                    : '진행은 이 브라우저에 저장됩니다',
+                                style: const TextStyle(
+                                  color: Ink.muted,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -434,6 +442,19 @@ class _ForgeScreenState extends State<ForgeScreen> {
           PixelButton(
             label: '설정',
             onPressed: game.busy && !game.autoRunning ? null : _settings,
+          ),
+          Tooltip(
+            message: state.audioMuted ? '음악과 효과음 켜기' : '음악과 효과음 음소거',
+            child: PixelButton(
+              key: const ValueKey('game-mute'),
+              label: state.audioMuted ? '소리 켜기' : '음소거',
+              icon: Icon(
+                state.audioMuted ? Icons.volume_off : Icons.volume_up,
+                size: 16,
+              ),
+              selected: state.audioMuted,
+              onPressed: () => game.setSettings(audioMuted: !state.audioMuted),
+            ),
           ),
           Tooltip(
             message: '게임 도움말',
@@ -1282,12 +1303,25 @@ class _ForgeScreenState extends State<ForgeScreen> {
           children: [
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
+              title: const Text('배경음악'),
+              subtitle: const Text('자동 반복 재생 · 첫 클릭/터치에서 시작할 수 있습니다'),
+              activeThumbColor: Ink.orange,
+              value: state.musicEnabled,
+              onChanged: (value) => game.setSettings(musicEnabled: value),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
               title: const Text('효과음'),
               subtitle: const Text('망치 타격 · 검 파괴 소리'),
               activeThumbColor: Ink.orange,
               value: state.soundEnabled,
               onChanged: (value) => game.setSettings(soundEnabled: value),
             ),
+            if (state.audioMuted)
+              const Text(
+                '전체 음소거 중입니다. 상단의 소리 켜기로 해제하세요.',
+                style: TextStyle(color: Ink.muted, fontSize: 12),
+              ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('짧은 강화 연출'),

@@ -41,6 +41,10 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
     if (this.state.protectionRefund > 0) {
       message = '보유 보호권을 골드로 환급했습니다. 보호비는 강화할 때 결제합니다.';
     }
+    if (this.state.checkpointMigrated) {
+      message = '구매한 시작점을 +11·21·31로 무료 승계했습니다. 현재 검은 그대로 유지됩니다.';
+    }
+    _syncMusic();
     WidgetsBinding.instance.addObserver(this);
     if (trackTime) {
       _playTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -54,13 +58,16 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
     SaveRepository repository, {
     ForgeAudio? audio,
   }) async {
+    GameState? state;
     try {
-      return GameController(repository, state: repository.load(), audio: audio);
+      state = repository.load();
     } catch (_) {
       await repository.preserveInvalidSave();
-      return GameController(repository, audio: audio)
-        ..saveError = '기존 저장을 읽지 못했습니다. 복구 사본을 보존하고 새 대장간을 열었습니다.';
+      rethrow;
     }
+    // Preserve the original code before a timer or any user action can save it.
+    await repository.preserveBeforeUpgrade(state);
+    return GameController(repository, state: state, audio: audio);
   }
 
   Duration get animationDuration {
@@ -254,6 +261,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
       _cancelSounds();
       state = next;
       rules = GameRules(state, roll: roll);
+      _syncMusic();
       outcome = null;
       message = next.protectionRefund > 0
           ? '$resultMessage 보유 보호권을 골드로 환급했습니다.'
@@ -270,35 +278,56 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
     bool? shortAnimation,
     bool? confirmHigh,
     bool? soundEnabled,
+    bool? musicEnabled,
+    bool? audioMuted,
   }) {
     if (_replacingState) return;
     state.shortAnimation = shortAnimation ?? state.shortAnimation;
     state.confirmHigh = confirmHigh ?? state.confirmHigh;
     state.soundEnabled = soundEnabled ?? state.soundEnabled;
-    if (soundEnabled == false) _cancelSounds();
-    if (soundEnabled == true) unlockAudio();
+    state.musicEnabled = musicEnabled ?? state.musicEnabled;
+    state.audioMuted = audioMuted ?? state.audioMuted;
+    if (soundEnabled == false || audioMuted == true) _cancelSounds();
+    _syncMusic();
+    if (soundEnabled == true || musicEnabled == true || audioMuted == false) {
+      unlockAudio();
+    }
     _save(urgent: true);
     notify();
   }
 
   /// Call directly from a user action, before confirmation/material dialogs.
   void unlockAudio() {
-    if (!_disposed && _active && state.soundEnabled) audio.unlock();
+    if (!_disposed &&
+        _active &&
+        !state.audioMuted &&
+        (state.soundEnabled || state.musicEnabled)) {
+      audio.unlock();
+    }
   }
+
+  void _syncMusic() => audio.setMusic(
+    playing: !_disposed && _active && state.musicEnabled && !state.audioMuted,
+  );
 
   void _scheduleSounds(Outcome result, Duration duration) {
     for (final timer in _soundTimers) {
       timer.cancel();
     }
     _soundTimers.clear();
-    if (!state.soundEnabled || !_active) return;
+    if (!state.soundEnabled || state.audioMuted || !_active) return;
     final quiet = autoRunning;
     void at(double progress, void Function() play) {
       _soundTimers.add(
         Timer(
           Duration(microseconds: (duration.inMicroseconds * progress).round()),
           () {
-            if (!_disposed && _active && state.soundEnabled) play();
+            if (!_disposed &&
+                _active &&
+                state.soundEnabled &&
+                !state.audioMuted) {
+              play();
+            }
           },
         ),
       );
@@ -323,6 +352,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _active = state == AppLifecycleState.resumed;
+    _syncMusic();
     if (!_active) {
       _cancelSounds();
       stopAuto();

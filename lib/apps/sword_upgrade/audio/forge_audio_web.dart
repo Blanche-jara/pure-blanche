@@ -26,6 +26,37 @@ class WebForgeAudio extends ForgeAudio {
   int _hammerIndex = 0;
   int _breakIndex = 0;
   bool _disposed = false;
+  web.HTMLAudioElement? _music;
+  bool _musicRequested = false;
+
+  @override
+  void setMusic({required bool playing}) {
+    _musicRequested = playing;
+    if (playing) {
+      _playMusic();
+    } else {
+      _music?.pause();
+    }
+  }
+
+  void _playMusic() {
+    if (_disposed || !_musicRequested) return;
+    final music = _music ??=
+        (web.document.createElement('audio') as web.HTMLAudioElement)
+          ..src = 'assets/assets/sword_upgrade/audio/bgm.mp3'
+          ..loop = true
+          ..preload = 'metadata'
+          ..volume = .18
+          ..setAttribute('data-sword-bgm', '')
+          ..setAttribute('aria-hidden', 'true')
+          ..setAttribute('hidden', '');
+    if (!music.isConnected) web.document.body?.appendChild(music);
+    // Stream the song independently; a blocked autoplay never delays the game.
+    // Retry synchronously on the next click/touch/key, preserving playback time.
+    if (music.paused) {
+      unawaited(music.play().toDart.catchError((Object _) => null));
+    }
+  }
 
   @override
   Future<void> load() async {
@@ -47,6 +78,7 @@ class WebForgeAudio extends ForgeAudio {
   @override
   void unlock() {
     if (_disposed) return;
+    _playMusic();
     try {
       if (_context == null) {
         final context = web.AudioContext(
@@ -122,6 +154,7 @@ class WebForgeAudio extends ForgeAudio {
 
   @override
   void stop() {
+    _music?.pause();
     _generation++;
     for (final voice in _voices.toList()) {
       _fadeOut(voice);
@@ -133,6 +166,10 @@ class WebForgeAudio extends ForgeAudio {
   void dispose() {
     stop();
     _disposed = true;
+    _music?.remove();
+    _music?.removeAttribute('src');
+    _music?.load();
+    _music = null;
     final context = _context;
     if (context != null) {
       unawaited(context.close().toDart.catchError((Object _) => null));

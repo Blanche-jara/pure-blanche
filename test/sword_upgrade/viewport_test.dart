@@ -23,7 +23,7 @@ void main() {
       final repository = SaveRepository(await SharedPreferences.getInstance());
       final state = GameState()
         ..sword = const Sword(level: 5)
-        ..bestLevel = 30;
+        ..bestLevel = 31;
       final game = GameController(
         repository,
         state: state,
@@ -160,7 +160,7 @@ void main() {
         repository,
         state: GameState()
           ..gold = 1e20
-          ..bestLevel = 30
+          ..bestLevel = 31
           ..rareFinds = 1
           ..discovered['alexandros'] = 0,
         trackTime: false,
@@ -174,7 +174,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('상점'));
       await tester.pumpAndSettle();
-      for (final level in [10, 20, 30]) {
+      for (final level in [11, 21, 31]) {
         final button = find.byKey(ValueKey('buy-start-$level'));
         await tester.ensureVisible(button);
         await tester.tap(button);
@@ -201,7 +201,7 @@ void main() {
       expect(game.state.sword.level, 0);
       expect(game.state.sword.isRare, isFalse);
       await game.saveNow();
-      expect(repository.load()?.unlockedStartLevel, 30);
+      expect(repository.load()?.unlockedStartLevel, 31);
       expect(repository.load()?.rareStarts, ['alexandros']);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());

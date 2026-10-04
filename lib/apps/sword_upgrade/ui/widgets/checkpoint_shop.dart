@@ -90,7 +90,7 @@ class _CheckpointShopState extends State<CheckpointShop> {
         ),
         const SizedBox(height: 8),
         const Text(
-          '발견한 종류만 구매할 수 있습니다. 가격은 일반 +30 시작점의 30배. 기본 가치 34.8조 G·내구도 3으로 시작합니다.',
+          '발견한 종류만 구매할 수 있습니다. 가격은 일반 +31 시작점의 30배. 기본 가치 34.8조 G·내구도 3으로 시작합니다.',
           style: TextStyle(color: Ink.muted, fontSize: 14, height: 1.5),
         ),
         const SizedBox(height: 12),
@@ -144,7 +144,7 @@ class _CheckpointShopState extends State<CheckpointShop> {
         ),
         const SizedBox(height: 16),
         const Text(
-          '시작 검은 한 번 강화해야 판매·보관 가능합니다. 판매액은 늘어난 가치 기준이며 돌파 재료도 필요합니다. +0 시작은 언제든 무료로 선택할 수 있습니다.',
+          '시작 검은 한 번 강화해야 판매·보관 가능합니다. 판매액은 늘어난 가치 기준입니다. +11·21·31은 직전 돌파를 건너뛰며 이후 돌파에는 재료가 필요합니다. +0 시작은 언제든 무료로 선택할 수 있습니다.',
           style: TextStyle(color: Ink.muted, fontSize: 12, height: 1.5),
         ),
       ],

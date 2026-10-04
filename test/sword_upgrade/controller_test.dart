@@ -171,18 +171,20 @@ void main() {
     expect(game.autoRunning, isFalse);
     game.dispose();
   });
-  testWidgets('auto stops at the gate of a purchased replacement starter', (
+  testWidgets('buying a checkpoint keeps an enhanced sword and its remaining gate', (
     tester,
   ) async {
     final state = GameState()
       ..gold = 1e20
-      ..bestLevel = 10
+      ..bestLevel = 11
       ..sword = const Sword(level: 9)
       ..autoTarget = 12;
-    final game = await make(state, roll: () => .999);
-    game.rules.buyNormalStart(10);
+    final game = await make(state, roll: () => 0);
+    game.rules.buyNormalStart(11);
     final running = game.startAuto();
     await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 1200));
+    // The +10 gate still stops a run that started below the purchased checkpoint.
     await running;
     expect(state.sword.level, 10);
     expect(state.attempts, 1);

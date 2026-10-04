@@ -4,24 +4,40 @@ import '../engine/models.dart';
 
 class SaveRepository {
   static const key = 'sword_upgrade.save.v1';
+  // Old open tabs keep writing v1. Never expose schema 4 to the old reader.
+  static const currentKey = 'sword_upgrade.save.v4';
+  static const preUpgradeKey = '$key.beforeSchema4';
   final SharedPreferences preferences;
   Future<void> _writes = Future.value();
   SaveRepository(this.preferences);
   GameState? load() {
-    final raw = preferences.getString(key);
+    final raw = preferences.getString(currentKey) ?? preferences.getString(key);
     if (raw == null) return null;
     return decode(raw);
   }
 
   Future<void> preserveInvalidSave() async {
+    final sourceKey = preferences.containsKey(currentKey) ? currentKey : key;
+    final raw = preferences.getString(sourceKey);
+    if (raw != null) await preferences.setString('$sourceKey.recovery', raw);
+  }
+
+  Future<void> preserveBeforeUpgrade(GameState? state) async {
+    if (state == null ||
+        state.loadedSchemaVersion >= GameState.schemaVersion ||
+        preferences.containsKey(preUpgradeKey)) {
+      return;
+    }
     final raw = preferences.getString(key);
-    if (raw != null) await preferences.setString('$key.recovery', raw);
+    if (raw != null && !await preferences.setString(preUpgradeKey, raw)) {
+      throw StateError('업데이트 전 저장의 복구 사본을 보존하지 못했습니다.');
+    }
   }
 
   Future<void> save(GameState state) {
     final code = encode(state);
     final next = _writes.catchError((Object _) {}).then((_) async {
-      if (!await preferences.setString(key, code)) {
+      if (!await preferences.setString(currentKey, code)) {
         throw StateError('브라우저에 저장하지 못했습니다. 백업 코드를 보관하세요.');
       }
     });

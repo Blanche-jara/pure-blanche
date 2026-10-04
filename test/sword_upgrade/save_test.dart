@@ -96,7 +96,7 @@ void main() {
     expect(restored.startLevel, 0);
     expect(restored.unlockedStartLevel, 0);
     expect(restored.rareStarts, isEmpty);
-    expect(restored.toJson()['schemaVersion'], 3);
+    expect(restored.toJson()['schemaVersion'], 4);
   });
   test('old saves default sound on; invalid audio settings are rejected', () {
     for (final version in [1, 2]) {
@@ -140,7 +140,7 @@ void main() {
   test('checkpoint ownership, choice and sword basis survive a backup', () {
     final state = GameState()
       ..bestLevel = 30
-      ..unlockedStartLevel = 30
+      ..unlockedStartLevel = 31
       ..startLevel = 0
       ..rareStarts = ['softshell']
       ..startRareId = 'softshell'
@@ -237,7 +237,7 @@ void main() {
       final again = SaveRepository.decode(SaveRepository.encode(restored));
       expect(again.gold, restored.gold);
       expect(again.protectionRefund, 0);
-      expect(again.toJson()['schemaVersion'], 3);
+      expect(again.toJson()['schemaVersion'], 4);
       expect(again.toJson().containsKey('protectionTickets'), isFalse);
       for (final invalid in [
         null,
@@ -267,6 +267,7 @@ void main() {
               File('test/sword_upgrade/fixtures/CHEAT_BACKUP.txt').readAsStringSync(),
             ).toJson()
             ..['schemaVersion'] = 2
+            ..['unlockedStartLevel'] = 30
             ..['protectionTickets'] = [20, 20, 20];
       final restored = GameState.fromJson(old);
       expect(restored.gold, 1e100);
@@ -300,7 +301,7 @@ void main() {
       );
       expect(cheat.negotiation, 5);
       expect(cheat.rareChance, .05);
-      expect(cheat.unlockedStartLevel, 30);
+      expect(cheat.unlockedStartLevel, 31);
       expect(cheat.rareStarts.length, 7);
       expect(cheat.discovered.values.every((level) => level == 10), isTrue);
       expect(cheat.bestLevel, 38);
